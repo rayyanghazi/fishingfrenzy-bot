@@ -1,0 +1,11 @@
+{
+    "proxy": true,
+    "quest": true,
+    "upgrade_skill": true,
+    "sell_all_fish": true,
+    "fishing": true,
+    "fishing_type": 1,
+    "daily": true,
+    "delay_loop": 3000,
+    "delay_account_switch": 10
+}  
