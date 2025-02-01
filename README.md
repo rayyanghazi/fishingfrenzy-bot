@@ -54,7 +54,7 @@ Start using Fishing Frenzy by registering through the following link:
 
 <div align="center">
   <a href="https://t.me/fishingfrenzy_bot/fishingfrenzyapp?startapp=HE8W8F" target="_blank">
-    <img src="https://img.shields.io/static/v1?message=Fishinhg Frenzy&logo=telegram&label=&color=2CA5E0&logoColor=white&labelColor=&style=for-the-badge" height="25" alt="telegram logo" />
+    <img src="https://img.shields.io/static/v1?message=FishinhgFrenzy&logo=telegram&label=&color=2CA5E0&logoColor=white&labelColor=&style=for-the-badge" height="25" alt="telegram logo" />
   </a>
 </div>
 
