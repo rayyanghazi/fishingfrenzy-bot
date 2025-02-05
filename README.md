@@ -1,5 +1,3 @@
-Below is the revised README with the added registration link for those who haven't set up their Fishing Frenzy account yet:
-
 ---
 
 <h1 align="center">Fishing Frenzy Bot</h1>
