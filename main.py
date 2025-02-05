@@ -221,7 +221,7 @@ class fishingfrenzy:
         Sebelum dikirim, data frame (frs) dihasilkan dengan menginterpolasi antar key frame
         sehingga jumlah data yang dikirim bisa mencapai ratusan titik seperti contoh payload.
         """
-        import json, time, websocket
+        
 
         # Tentukan tipe memancing dan biaya energi.
         fishing_type = self.config.get("fishing_type")
@@ -253,6 +253,13 @@ class fishingfrenzy:
                 y = round(p0[1] + (p1[1] - p0[1]) * t)
                 pts.append([x, y])
             return pts
+
+        if self.energy < energy_cost:
+            self.log("⚠️ Not enough energy for fishing. Attempting to buy and use sushi...", Fore.YELLOW)
+            result = self.buy_and_use_sushi()
+            if result == 0:
+                self.log("❌ Not enough gold to buy sushi. Stopping fishing sessions.", Fore.RED)
+            time.sleep(1)
 
         while self.energy >= energy_cost:
 
@@ -349,8 +356,6 @@ class fishingfrenzy:
                     msg_type = parsed.get("type")
                     if msg_type == "initGame":
                         # Pesan inisialisasi game.
-                        fish = parsed.get("data", {}).get("randomFish", {}).get("fishName")
-                        self.log(f"🎣 Targeting fish: {fish}", Fore.CYAN)
                         start_msg = json.dumps({"cmd": "start"})
                         ws.send(start_msg)
                         self.log("📡 Sent 'start' command. Fishing started...", Fore.CYAN)
@@ -377,9 +382,8 @@ class fishingfrenzy:
 
                     elif msg_type == "gameOver":
                         # Pesan gameOver diterima.
-                        energy = parsed.get("energy")
                         if parsed.get("success"):
-                            self.log(f"✅ Session succeeded! Energy Left: {energy}", Fore.GREEN)
+                            self.log(f"✅ Session succeeded!", Fore.GREEN)
                         else:
                             self.log("❌ Session failed.", Fore.RED)
                         if not end_sent and len(key_frames) >= required_frames:
