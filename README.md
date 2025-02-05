@@ -1,3 +1,5 @@
+Below is the revised README with the added registration link for those who haven't set up their Fishing Frenzy account yet:
+
 ---
 
 <h1 align="center">Fishing Frenzy Bot</h1>
@@ -19,6 +21,14 @@ Fishing Frenzy Bot is designed to automate various tasks in **Fishing Frenzy**, 
 - **Event System**: Automatically switch to the event area (without purchasing event items).
 
 This bot is built to save you time and streamline your gameplay, allowing you to focus on strategy and enjoying the game.
+
+---
+
+## 🎣 Register for Fishing Frenzy
+
+If you don't have a Fishing Frenzy account yet, register now by clicking the link below:
+
+👉 [Register Your Fishing Frenzy Account](https://t.me/fishingfrenzy_bot/fishingfrenzyapp?startapp=HE8W8F)
 
 ---
 
@@ -91,7 +101,7 @@ This bot is built to save you time and streamline your gameplay, allowing you to
    ```
 
    > **Note:** Only `HTTP` and `HTTPS` proxies are supported.
-   
+
 6. **Run the Bot**  
    Start the bot by running:
 
