@@ -16,57 +16,38 @@ Fishing Frenzy Bot is designed to automate various tasks in **Fishing Frenzy**, 
 - **Sell All Fish**: Sell all your fish without manual intervention.
 - **Fishing Automation**: Enjoy automatic fishing with configurable types.
 - **Daily Tasks**: Automatically handle daily activities for extra rewards.
+- **Event System**: Automatically switch to the event area (without purchasing event items).
 
 This bot is built to save you time and streamline your gameplay, allowing you to focus on strategy and enjoying the game.
 
 ---
 
-## 🌟 Version v1.0.1
+## 🌟 Version v1.0.2
 
 ### Updates
 
-- **Update:** The fishing system has been fixed and is now working as intended.
+- **Sushi System Fix:** The sushi system has been corrected for proper functionality.
+- **Auto Claim Daily Quest:** Daily quests are now automatically claimed when completed.
+- **Auto Event System:** Automatically switches to the event area (note: this does not include purchasing event items).
 
 ---
 
-## ℹ️ Getting Started with UserInfo Bot
-
-To avoid any confusion when setting up your account data, please use the [UserInfo Bot](https://github.com/nadam/userinfobot). This bot displays your user information when you forward a message to it. **Remember:** the query format should be:
-
-```
-id|telegram_username
-```
-
-Make sure you obtain your correct information from the UserInfo Bot before proceeding with the setup.
-
----
-
-## 📥 **How to Register**
-
-Start using Fishing Frenzy by registering through the following link:
-
-<div align="center">
-  <a href="https://t.me/fishingfrenzy_bot/fishingfrenzyapp?startapp=HE8W8F" target="_blank">
-    <img src="https://img.shields.io/static/v1?message=FishinhgFrenzy&logo=telegram&label=&color=2CA5E0&logoColor=white&labelColor=&style=for-the-badge" height="25" alt="telegram logo" />
-  </a>
-</div>
-
----
 ## ⚙️ Configuration (`config.json`)
 
-Below is the configuration table for the Fishing Frenzy Bot. Adjust these settings in your `config.json` file as needed:
+> **Note:** If you are using more than one account, you **must** use proxies.
 
 | **Setting**            | **Description**                                                              | **Default Value** |
 | ---------------------- | ---------------------------------------------------------------------------- | ----------------- |
-| `proxy`                | **Mandatory** for multi-account setups. Enable proxy usage for each account. | `true`            |
-| `quest`                | Automatically complete quests                                                | `true`            |
-| `upgrade_skill`        | Automatically upgrade your skills                                            | `true`            |
-| `sell_all_fish`        | Automatically sell all caught fish                                           | `true`            |
-| `fishing`              | Enable automatic fishing                                                     | `true`            |
-| `fishing_type`         | Set the fishing type (1 for short, 2 for mid, and 3 for long)                | `1`               |
-| `daily`                | Automatically complete daily tasks                                           | `true`            |
-| `delay_loop`           | Delay (in seconds) before the next loop                                      | `3000`            |
-| `delay_account_switch` | Delay (in seconds) between switching accounts                                | `10`              |
+| `proxy`                | **Mandatory for multi-account setups.** Enable proxy usage for each account. | `true`            |
+| `quest`                | Automatically complete quests.                                               | `true`            |
+| `upgrade_skill`        | Automatically upgrade your skills.                                           | `true`            |
+| `sell_all_fish`        | Automatically sell all caught fish.                                          | `true`            |
+| `event`                | Automatically switch to the event area.                                      | `true`            |
+| `fishing`              | Enable automatic fishing.                                                    | `true`            |
+| `fishing_type`         | Set the fishing type (1 for short, 2 for mid, and 3 for long).                | `1`               |
+| `daily`                | Automatically complete daily tasks.                                          | `true`            |
+| `delay_loop`           | Delay (in milliseconds) before the next loop.                               | `3000`            |
+| `delay_account_switch` | Delay (in seconds) between switching accounts.                               | `10`              |
 
 ---
 
@@ -97,7 +78,7 @@ Below is the configuration table for the Fishing Frenzy Bot. Adjust these settin
    Create a file named `query.txt` and paste your query data in the format obtained from the UserInfo Bot:
 
    ```
-   id|telegram_username
+   id|first_username
    ```
 
 5. **Set Up Proxies (Mandatory for Multi-Account Usage)**  
@@ -133,3 +114,5 @@ This project is developed by **Livexords**. If you have any suggestions, questio
     <img src="https://img.shields.io/static/v1?message=Livexords&logo=telegram&label=&color=2CA5E0&logoColor=white&labelColor=&style=for-the-badge" height="25" alt="telegram logo" />
   </a>
 </div>
+
+---

@@ -3,6 +3,7 @@
     "quest": true,
     "upgrade_skill": true,
     "sell_all_fish": true,
+    "event": true,
     "fishing": true,
     "fishing_type": 1,
     "daily": true,

@@ -235,7 +235,7 @@ class fishingfrenzy:
             range_type = "long_range"
             energy_cost = 3
 
-        self.log(f"🎣 Starting fishing sessions with type: {range_type} (energy cost: {energy_cost})", Fore.CYAN)
+        self.log(f"🎣 Starting fishing sessions with type: {range_type} (energy cost: {energy_cost}) (your energy: {self.energy})", Fore.CYAN)
 
         # Parameter untuk pengumpulan key frame dan interpolasi.
         # Kita akan mengirim pesan "end" segera setelah menerima 10 frame.
@@ -254,16 +254,7 @@ class fishingfrenzy:
                 pts.append([x, y])
             return pts
 
-        while True:
-            # Cek apakah energi cukup, jika tidak, beli sushi.
-            if self.energy < energy_cost:
-                self.log("⚠️ Not enough energy for fishing. Attempting to buy and use sushi...", Fore.YELLOW)
-                result = self.buy_and_use_sushi()
-                if result == 0:
-                    self.log("❌ Not enough gold to buy sushi. Stopping fishing sessions.", Fore.RED)
-                    break
-                time.sleep(1)
-                continue
+        while self.energy >= energy_cost:
 
             ws_url = f"wss://fishing-frenzy-api-0c12a800fbfe.herokuapp.com/?token={self.access_token}"
             try:
@@ -332,7 +323,7 @@ class fishingfrenzy:
                         },
                         "en": 1
                     }
-                    self.log("📡 Sending 'end' payload: " + json.dumps(end_payload), Fore.CYAN)
+                    self.log("📡 Sending end", Fore.CYAN)
                     ws.send(json.dumps(end_payload))
                     time.sleep(1)
 
@@ -383,13 +374,12 @@ class fishingfrenzy:
                         if len(key_frames) == required_frames:
                             self.log("⚠️ Reached 10 key frames. Sending end message...", Fore.YELLOW)
                             end_game()
-                            break
 
                     elif msg_type == "gameOver":
                         # Pesan gameOver diterima.
-                        energy = parsed.get("catchedFish", {}).get("energy")
+                        energy = parsed.get("energy")
                         if parsed.get("success"):
-                            self.log(f"✅ Session succeeded! Caught fish: {fish} | Energy Left: {energy}", Fore.GREEN)
+                            self.log(f"✅ Session succeeded! Energy Left: {energy}", Fore.GREEN)
                         else:
                             self.log("❌ Session failed.", Fore.RED)
                         if not end_sent and len(key_frames) >= required_frames:
@@ -402,6 +392,14 @@ class fishingfrenzy:
                 self.energy -= energy_cost
                 self.log(f"⏱️ Session finished. Remaining energy: {self.energy}", Fore.YELLOW)
                 time.sleep(1)
+                if self.energy < energy_cost:
+                    self.log("⚠️ Not enough energy for fishing. Attempting to buy and use sushi...", Fore.YELLOW)
+                    result = self.buy_and_use_sushi()
+                    if result == 0:
+                        self.log("❌ Not enough gold to buy sushi. Stopping fishing sessions.", Fore.RED)
+                        break
+                    time.sleep(1)
+                continue
 
             except Exception as e:
                 self.log(f"❌ Error during fishing session: {e}", Fore.RED)
@@ -613,6 +611,8 @@ class fishingfrenzy:
                         req_url_use_sushi = f"{self.BASE_URL}items/{sushi_id}/use?userId={user_id}&quantity=1"
                         use_response = requests.get(req_url_use_sushi, headers=headers)
                         use_response.raise_for_status()
+                        data = use_response.json()
+                        self.energy = data.get('energy', 0)
                     self.log(f"✅ Used {used_sushi} Sushi to restore energy.", Fore.GREEN)
                 else:
                     self.log("ℹ️ Not enough Sushi in inventory to restore energy.", Fore.YELLOW)
@@ -629,10 +629,10 @@ class fishingfrenzy:
                     buy_response = requests.get(req_url_buy_sushi, headers=headers)
                     buy_response.raise_for_status()
                     self.log(f"✅ Purchased {buy_quantity} Sushi.", Fore.GREEN)
+                    return 1
                 else:
                     self.log("❌ Not enough gold to buy Sushi.", Fore.RED)
-
-            return 1
+                    return 0
 
         except requests.exceptions.RequestException as e:
             self.log(f"❌ Failed to process sushi transactions: {e}", Fore.RED)
@@ -646,9 +646,15 @@ class fishingfrenzy:
     
     def upgrade_skill(self) -> int:
         """
-        Retrieves the accessories data from the server, displays each skill's name,
-        current level, and effect. Then, it searches for the "Lucky Charm" accessory and
-        attempts to upgrade it if the user has enough upgrade points.
+        Retrieves the accessories data from the server, displays the current status of each skill,
+        and then attempts to upgrade the first eligible skill based on the priority order.
+        
+        Priority order for upgrades:
+        1. Rod Handle (Reduces Energy Consumption) 🔋
+        2. Icebox (Increases Gold Income) 💰
+        3. Fishing Manual (Increases EXP per Catch) 📖
+        4. Lucky Charm (Increases Chance for Item Drop) 🍀
+        5. Cutting Board (Reduces Bait Consumption) 🎣
         """
         req_url_accessories = f"{self.BASE_URL}accessories"
         headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
@@ -659,7 +665,7 @@ class fishingfrenzy:
             response.raise_for_status()
             data = response.json()
 
-            # Get available upgrade points and accessories list
+            # Retrieve available upgrade points and accessories list
             available_upgrade_points = data.get("availableUpgradePoint", 0)
             accessories = data.get("accessories", [])
 
@@ -675,34 +681,50 @@ class fishingfrenzy:
                 )
                 self.log(f"   - {name}: Level {current_level} with Effect {effect}", Fore.YELLOW)
 
-            # Find the accessory with ID "6766e9052546c7705aaf55da" (Lucky Charm)
-            lucky_charm = next(
-                (acc for acc in accessories if acc.get("accessoryId") == "6766e9052546c7705aaf55da"),
-                None
-            )
-            if not lucky_charm:
-                self.log("❌ 'Lucky Charm' accessory not found.", Fore.RED)
-                return 0
-
-            # Check if the user has enough upgrade points
+            # Check if the user has any upgrade points available
             if available_upgrade_points <= 0:
-                self.log("❌ You don't have enough upgrade points to upgrade 'Lucky Charm'.", Fore.RED)
+                self.log("❌ You don't have enough upgrade points to upgrade any skill.", Fore.RED)
                 return 0
 
-            # Attempt to upgrade Lucky Charm
-            req_url_upgrade = f"{self.BASE_URL}accessories/6766e9052546c7705aaf55da/upgrade"
-            self.log("📡 Upgrading 'Lucky Charm'...", Fore.CYAN)
-            upgrade_response = requests.post(req_url_upgrade, headers=headers)
-            upgrade_response.raise_for_status()
+            # Define the upgrade priority order by skill name
+            priority_order = [
+                "Rod Handle",      # 1. Reduces Energy Consumption
+                "Icebox",          # 2. Increases Gold Income
+                "Fishing Manual",  # 3. Increases EXP per Catch
+                "Lucky Charm",     # 4. Increases Chance for Item Drop
+                "Cutting Board",   # 5. Reduces Bait Consumption
+            ]
 
-            if upgrade_response.status_code == 200:
-                self.log("✅ 'Lucky Charm' has been successfully upgraded.", Fore.GREEN)
-            else:
-                self.log(f"❌ Failed to upgrade 'Lucky Charm'. Status Code: {upgrade_response.status_code}", Fore.RED)
-                self.log(f"📄 Response: {upgrade_response.text}", Fore.RED)
-                return 0
+            # Iterate over the priority order to find a skill that can be upgraded
+            for skill_name in priority_order:
+                # Find the accessory with the matching name
+                accessory = next((acc for acc in accessories if acc.get("name") == skill_name), None)
+                if accessory:
+                    current_level = accessory.get("currentLevel", 0)
+                    max_level = accessory.get("maxLevel", 0)
+                    # Ensure the skill hasn't reached its maximum level
+                    if current_level < max_level:
+                        accessory_id = accessory.get("accessoryId")
+                        req_url_upgrade = f"{self.BASE_URL}accessories/{accessory_id}/upgrade"
+                        self.log(f"📡 Upgrading '{skill_name}'...", Fore.CYAN)
+                        upgrade_response = requests.post(req_url_upgrade, headers=headers)
+                        upgrade_response.raise_for_status()
 
-            return 1
+                        if upgrade_response.status_code == 200:
+                            self.log(f"✅ '{skill_name}' has been successfully upgraded.", Fore.GREEN)
+                            return 1  # Upgrade succeeded; exit the function
+                        else:
+                            self.log(f"❌ Failed to upgrade '{skill_name}'. Status Code: {upgrade_response.status_code}", Fore.RED)
+                            self.log(f"📄 Response: {upgrade_response.text}", Fore.RED)
+                            return 0
+                    else:
+                        self.log(f"ℹ️ '{skill_name}' is already at max level ({max_level}). Skipping...", Fore.MAGENTA)
+                else:
+                    self.log(f"ℹ️ Skill '{skill_name}' not found in your accessories list. Skipping...", Fore.MAGENTA)
+
+            # If no eligible skill was found for upgrade
+            self.log("ℹ️ No eligible skill found for upgrade.", Fore.YELLOW)
+            return 0
 
         except requests.exceptions.RequestException as e:
             self.log(f"❌ Request error: {e}", Fore.RED)
@@ -723,47 +745,56 @@ class fishingfrenzy:
     def quest(self) -> dict:
         """
         Fetches the list of social quests from the server and then attempts to verify each quest.
+        Additionally, fetches the list of daily quests and claims those that are completed and not yet claimed.
         
-        The function uses self.HEADERS and self.access_token for authentication. It first sends a GET
-        request to retrieve the quests, then iterates over the returned quests and performs a POST request 
-        to verify each quest using additional headers (including an "origin" header).
-
+        The function uses self.HEADERS and self.access_token for authentication. It first sends a GET request 
+        to retrieve the social quests and then verifies each quest via a POST request. After that, it retrieves
+        the daily quests from {self.BASE_URL}user-quests and sends a POST request to claim each eligible daily quest.
+        
         Returns:
-        A dictionary with two keys:
-            - "quests": the list of social quests fetched from the server.
-            - "verification_results": a list of results from verifying each quest.
+            A dictionary with three keys:
+                - "quests": the list of social quests fetched from the server.
+                - "verification_results": a list of results from verifying each social quest.
+                - "daily_claim_results": a list of results from claiming each daily quest.
         """
-        import requests
-        import json
 
-        base_url = "https://fishing-frenzy-api-0c12a800fbfe.herokuapp.com/v1/social-quests/"
-        # Use self.HEADERS with the access token for GET requests
+        # Social quests URL is hard-coded while daily quests use the BASE_URL of the instance
+        social_quests_url = f"{self.BASE_URL}social-quests"
+        daily_quests_url = f"{self.BASE_URL}user-quests"
+        
+        # Prepare headers for authentication
         get_headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
+        
         verification_results = []
-
+        daily_claim_results = []
+        
+        # --- SOCIAL QUESTS FETCH AND VERIFICATION ---
         try:
             self.log("📡 Fetching social quests...", Fore.CYAN)
-            response = requests.get(base_url, headers=get_headers)
+            response = requests.get(social_quests_url, headers=get_headers)
             response.raise_for_status()
             quests = response.json()
             self.log("✅ Social quests fetched successfully.", Fore.GREEN)
         except requests.exceptions.RequestException as e:
             self.log(f"❌ Error fetching social quests: {e}", Fore.RED)
-            return {"quests": [], "verification_results": []}
+            quests = []
 
-        # Iterate over the fetched quests and verify each one
+        # Iterate over the fetched social quests and verify only those that are necessary
         for quest in quests:
             quest_id = quest.get("id")
             if not quest_id:
                 self.log("❌ Quest without an ID found, skipping...", Fore.RED)
                 continue
 
-            verify_url = f"{base_url}{quest_id}/verify"
-            # Construct verification headers using self.HEADERS and include an origin header
-            verify_headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}", "origin": "https://fishingfrenzy.co"}
+            # Only verify quests that are unclaimed
+            if quest.get("status") != "UnClaimed":
+                self.log(f"ℹ️ Skipping quest {quest_id} as it is already claimed.", Fore.MAGENTA)
+                continue
+
+            verify_url = f"{social_quests_url}{quest_id}/verify"
             try:
                 self.log(f"📡 Verifying quest with ID {quest_id}...", Fore.CYAN)
-                verify_response = requests.post(verify_url, headers=verify_headers, data=json.dumps({}))
+                verify_response = requests.post(verify_url, headers=get_headers, data=json.dumps({}))
                 verify_response.raise_for_status()
                 result = verify_response.json()
                 self.log(f"✅ Quest {quest_id} verified successfully.", Fore.GREEN)
@@ -771,8 +802,70 @@ class fishingfrenzy:
             except requests.exceptions.RequestException as e:
                 self.log(f"❌ Error verifying quest {quest_id}: {e}", Fore.RED)
                 verification_results.append({"id": quest_id, "result": None})
+        
+        # --- DAILY QUESTS FETCH AND CLAIMING ---
+        try:
+            self.log("📡 Fetching daily quests...", Fore.CYAN)
+            daily_response = requests.get(daily_quests_url, headers=get_headers)
+            daily_response.raise_for_status()
+            daily_quests = daily_response.json()
+            self.log("✅ Daily quests fetched successfully.", Fore.GREEN)
+        except requests.exceptions.RequestException as e:
+            self.log(f"❌ Error fetching daily quests: {e}", Fore.RED)
+            daily_quests = []
 
-        return {"quests": quests, "verification_results": verification_results}
+        # Iterate over the daily quests and claim the ones that are completed but not yet claimed
+        for dq in daily_quests:
+            if dq.get("periodType") == "Daily" and dq.get("isCompleted") and not dq.get("isClaimed"):
+                quest_id = dq.get("id")
+                claim_url = f"{daily_quests_url}/{quest_id}/claim"
+                try:
+                    self.log(f"📡 Claiming daily quest with ID {quest_id}...", Fore.CYAN)
+                    claim_response = requests.post(claim_url, headers=get_headers)
+                    claim_response.raise_for_status()
+                    if claim_response.status_code == 200:
+                        self.log(f"✅ Daily quest {quest_id} claimed successfully.", Fore.GREEN)
+                        daily_claim_results.append({"id": quest_id, "claimed": True})
+                    else:
+                        self.log(f"❌ Failed to claim daily quest {quest_id}. Status Code: {claim_response.status_code}", Fore.RED)
+                        daily_claim_results.append({"id": quest_id, "claimed": False})
+                except requests.exceptions.RequestException as e:
+                    self.log(f"❌ Error claiming daily quest {quest_id}: {e}", Fore.RED)
+                    daily_claim_results.append({"id": quest_id, "claimed": False})
+        
+        return {
+            "quests": quests,
+            "verification_results": verification_results,
+            "daily_claim_results": daily_claim_results
+        }
+
+    def event(self) -> int:
+        """Switches to the event theme."""
+        req_url_event = f"{self.BASE_URL}events/678dc76a4083a7ae27297826/themes/678dc77c4083a7ae27297828/switch"
+        headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
+
+        try:
+            self.log("🟡 Switching to event theme...", Fore.CYAN)
+            response = requests.get(req_url_event, headers=headers)
+            response.raise_for_status()
+
+            if response.status_code == 200:
+                self.log("✅ Successfully switched to the event theme.", Fore.GREEN)
+                return 1
+            else:
+                self.log(f"❌ Failed to switch event. Status: {response.status_code}", Fore.RED)
+                self.log(f"📄 Response: {response.text}", Fore.RED)
+                return 0
+
+        except requests.exceptions.RequestException as e:
+            self.log(f"❌ Failed to switch event: {e}", Fore.RED)
+            return 0
+        except ValueError as e:
+            self.log(f"❌ Data error: {e}", Fore.RED)
+            return 0
+        except Exception as e:
+            self.log(f"❌ An unexpected error occurred: {e}", Fore.RED)
+            return 0
 
 if __name__ == "__main__":
     fishing = fishingfrenzy()
@@ -796,11 +889,12 @@ if __name__ == "__main__":
 
         fishing.log("🛠️ Starting task execution...")
         tasks = {
-            "daily": "🌞 Daily Check-In - Log in daily to receive rewards and bonuses.",
-            "sell_all_fish": "🐟 Sell All Fish - Convert your caught fish into extra gold.",
-            "upgrade_skill": "🚀 Upgrade Skill - Enhance your fishing abilities for better results.",
-            "quest": "📜 Quest - Complete exciting quests to earn rewards and unlock achievements.",
-            "fishing": "🎣 Fishing Tester - Try out the fishing simulation and test your strategy."
+            "event": "🎉 Event - Switch to the event theme for special activities.",
+            "daily": "🌞 Daily Check-In - Log in daily for rewards.",
+            "sell_all_fish": "🐟 Sell All Fish - Convert your fish into extra gold.",
+            "upgrade_skill": "🚀 Upgrade Skill - Enhance your fishing abilities.",
+            "quest": "📜 Quest - Complete quests to earn rewards.",
+            "fishing": "🎣 Fishing Tester - Try out the fishing simulation."
         }
 
         for task_key, task_name in tasks.items():
