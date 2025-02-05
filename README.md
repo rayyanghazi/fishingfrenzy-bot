@@ -21,18 +21,11 @@ This bot is built to save you time and streamline your gameplay, allowing you to
 
 ---
 
-## 🌟 Version v1.0.0
+## 🌟 Version v1.0.1
 
 ### Updates
 
-- **New Feature:** Added dynamic proxy support for each account (**mandatory when using multiple accounts**).
-- **New Feature:** Automatically complete quests and daily tasks.
-- **New Feature:** Auto upgrade skills to boost your performance.
-- **New Feature:** Auto sell all caught fish to keep your inventory clear.
-- **New Feature:** Configurable fishing types to suit your gameplay style.
-
-🔹 **Upcoming Update:**  
-The next version will focus on optimizing the **fishing system** to improve efficiency and maximize your catch rate. Stay tuned for better performance and more features!
+- **Update:** The fishing system has been fixed and is now working as intended.
 
 ---
 

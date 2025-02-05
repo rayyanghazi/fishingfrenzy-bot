@@ -215,21 +215,15 @@ class fishingfrenzy:
     
     def fishing(self) -> int:
         """
-        Connects to the fishing server via WebSocket and runs fishing sessions in a loop.
-        Each session costs energy based on the fishing type:
-        - short_range (fishing_type == 1): costs 1 energy
-        - mid_range (fishing_type == 2): costs 2 energy
-        - long_range (any other fishing_type): costs 3 energy
-
-        If there is not enough energy for a session, this method will call self.buy_and_use_sushi()
-        repeatedly until enough energy is restored. If sushi cannot be bought due to lack of gold,
-        the fishing loop stops.
-
-        Returns:
-            1 if the fishing sessions complete successfully, or 0 on failure.
+        Terhubung ke server WebSocket dan menjalankan sesi memancing.
+        Logika dasar pengiriman pesan 'end' dipertahankan, tetapi pesan 'end'
+        dikirim segera setelah menerima 10 frame (dari pesan "gameState").
+        Sebelum dikirim, data frame (frs) dihasilkan dengan menginterpolasi antar key frame
+        sehingga jumlah data yang dikirim bisa mencapai ratusan titik seperti contoh payload.
         """
+        import json, time, websocket
 
-        # Determine fishing type and corresponding energy cost.
+        # Tentukan tipe memancing dan biaya energi.
         fishing_type = self.config.get("fishing_type")
         if fishing_type == 1:
             range_type = "short_range"
@@ -243,17 +237,31 @@ class fishingfrenzy:
 
         self.log(f"🎣 Starting fishing sessions with type: {range_type} (energy cost: {energy_cost})", Fore.CYAN)
 
-        # Main loop: continue fishing until an unrecoverable error occurs (e.g., out of gold).
+        # Parameter untuk pengumpulan key frame dan interpolasi.
+        # Kita akan mengirim pesan "end" segera setelah menerima 10 frame.
+        required_frames = 10        # kirim end setelah menerima 10 key frame
+        interpolation_steps = 30    # jumlah titik interpolasi per interval antara key frame
+
+        # Fungsi interpolasi linier antar dua titik.
+        # Hasil interpolasi hanya mengandung koordinat [x, y].
+        def interpolate_points(p0, p1, steps):
+            pts = []
+            # Kita tidak mengulangi titik awal, sehingga mulai dari 1 hingga steps-1
+            for i in range(1, steps):
+                t = i / float(steps)
+                x = round(p0[0] + (p1[0] - p0[0]) * t)
+                y = round(p0[1] + (p1[1] - p0[1]) * t)
+                pts.append([x, y])
+            return pts
+
         while True:
-            # Check if current energy is enough for a session.
+            # Cek apakah energi cukup, jika tidak, beli sushi.
             if self.energy < energy_cost:
                 self.log("⚠️ Not enough energy for fishing. Attempting to buy and use sushi...", Fore.YELLOW)
-                # Attempt to replenish energy.
                 result = self.buy_and_use_sushi()
                 if result == 0:
                     self.log("❌ Not enough gold to buy sushi. Stopping fishing sessions.", Fore.RED)
                     break
-                # After replenishing, wait a moment and re-check energy.
                 time.sleep(1)
                 continue
 
@@ -263,62 +271,81 @@ class fishingfrenzy:
                 ws = websocket.create_connection(ws_url)
                 self.log("✅ Connected to WebSocket server.", Fore.GREEN)
 
-                # Initialize game state variables for the session.
-                is_game_initialized = False
-                frames = []
-                frame_count = 0
+                # List untuk menyimpan key frame yang diterima dari pesan "gameState".
+                # Setiap key frame akan berupa:
+                # - [x, y, frame, dir] jika dir != 0  (data lengkap)
+                # - [x, y] jika dir == 0
+                key_frames = []
                 session_start_time = time.time()
-                max_frames = 15
-                fps_default = 20
                 fish = None
+                end_sent = False  # Flag agar pesan "end" hanya dikirim sekali
 
-                # Helper function to start a new game.
-                def start_new_game():
-                    nonlocal is_game_initialized
-                    if not is_game_initialized:
-                        prepare_msg = json.dumps({"cmd": "prepare", "range": range_type})
-                        ws.send(prepare_msg)
-                        self.log("📡 Sent 'prepare' command. Getting ready for fishing...", Fore.CYAN)
-                    else:
-                        time.sleep(1)
-                        start_msg = json.dumps({"cmd": "start"})
-                        ws.send(start_msg)
-                        self.log("📡 Sent 'start' command. Fishing started...", Fore.CYAN)
-
-                # Helper function to end the game.
-                def end_game():
-                    nonlocal frame_count, frames
-                    end_time = time.time()
-                    duration = end_time - session_start_time
-                    fps_calculated = frame_count / duration if duration > 0 else fps_default
-                    end_payload = {
-                        "cmd": "end",
-                        "rep": {
-                            "fs": frame_count,
-                            "ns": len(frames),
-                            "fps": fps_calculated,
-                            "frs": frames
-                        },
-                        "en": 1
-                    }
-                    ws.send(json.dumps(end_payload))
-                    self.log("📡 Sent 'end' command.", Fore.CYAN)
-
+                # Fungsi perhitungan posisi (sesuai logika lamamu)
                 def calculate_position_x(frame: int, direction: int) -> int:
                     return 450 + frame * 2 + direction * 5
 
                 def calculate_position_y(frame: int, direction: int) -> int:
                     return 426 + frame * 2 - direction * 3
 
-                # Begin the session by sending the initial command.
+                # Fungsi untuk mengirim perintah "prepare" dan "start"
+                def start_new_game():
+                    prepare_msg = json.dumps({"cmd": "prepare", "range": range_type})
+                    ws.send(prepare_msg)
+                    self.log("📡 Sent 'prepare' command. Getting ready for fishing...", Fore.CYAN)
+
+                # Fungsi untuk mengirim pesan "end".
+                # Di sini, sebelum mengirim, kita lakukan interpolasi antar key frame.
+                def end_game():
+                    nonlocal end_sent
+                    if end_sent:
+                        return
+                    end_sent = True
+
+                    # Jika hanya ada satu key frame, tidak ada interpolasi
+                    if len(key_frames) < 2:
+                        final_frames = key_frames.copy()
+                    else:
+                        final_frames = []
+                        # Masukkan key frame pertama
+                        final_frames.append(key_frames[0])
+                        # Lakukan interpolasi antar key frame
+                        for i in range(1, len(key_frames)):
+                            prev = key_frames[i - 1]
+                            curr = key_frames[i]
+                            # Gunakan hanya koordinat untuk interpolasi
+                            p0 = prev[0:2]
+                            p1 = curr[0:2]
+                            interpolated_pts = interpolate_points(p0, p1, interpolation_steps)
+                            final_frames.extend(interpolated_pts)
+                            # Tambahkan key frame saat ini (dengan data lengkap jika ada)
+                            final_frames.append(curr)
+                    
+                    fps_value = 20  # sesuai dengan contoh payload
+                    self.log(f"📡 Final frame data (frs) contains {len(final_frames)} points from {len(key_frames)} key frames.", Fore.CYAN)
+                    end_payload = {
+                        "cmd": "end",
+                        "rep": {
+                            "fs": 100,
+                            "ns": 200,
+                            "fps": fps_value,
+                            "frs": final_frames
+                        },
+                        "en": 1
+                    }
+                    self.log("📡 Sending 'end' payload: " + json.dumps(end_payload), Fore.CYAN)
+                    ws.send(json.dumps(end_payload))
+                    time.sleep(1)
+
+                # Mulai sesi dengan mengirim perintah prepare
                 start_new_game()
 
-                # Process incoming messages from the WebSocket.
+                # Loop untuk menerima pesan dari server.
                 while True:
                     try:
                         message = ws.recv()
                     except websocket.WebSocketTimeoutException:
-                        continue  # If no message is received, continue waiting.
+                        continue
+
                     if not message:
                         continue
 
@@ -330,45 +357,56 @@ class fishingfrenzy:
 
                     msg_type = parsed.get("type")
                     if msg_type == "initGame":
-                        # Game initialization response received.
+                        # Pesan inisialisasi game.
                         fish = parsed.get("data", {}).get("randomFish", {}).get("fishName")
                         self.log(f"🎣 Targeting fish: {fish}", Fore.CYAN)
-                        is_game_initialized = True
-                        start_new_game()  # Start fishing after initialization.
+                        start_msg = json.dumps({"cmd": "start"})
+                        ws.send(start_msg)
+                        self.log("📡 Sent 'start' command. Fishing started...", Fore.CYAN)
 
                     elif msg_type == "gameState":
-                        # Process game state messages to record frames.
+                        # Proses pesan gameState sebagai key frame.
                         frame = parsed.get("frame", 0)
                         direction = parsed.get("dir", 0)
-                        frame_count += 1
                         x = calculate_position_x(frame, direction)
                         y = calculate_position_y(frame, direction)
-                        frames.append([x, y])
-                        self.log(f"🎯 Frame {frame_count}: x={x}, y={y}", Fore.MAGENTA)
-                        if frame_count >= max_frames:
+                        
+                        if direction != 0:
+                            entry = [x, y, frame, direction]
+                            self.log(f"🎯 Received key frame (full info): {entry}", Fore.MAGENTA)
+                        else:
+                            entry = [x, y]
+                            self.log(f"🎯 Received key frame (coordinates only): {entry}", Fore.MAGENTA)
+                        key_frames.append(entry)
+
+                        # Jika sudah menerima 10 key frame, langsung kirim pesan "end".
+                        if len(key_frames) == required_frames:
+                            self.log("⚠️ Reached 10 key frames. Sending end message...", Fore.YELLOW)
                             end_game()
+                            break
 
                     elif msg_type == "gameOver":
-                        # Final game result message.
+                        # Pesan gameOver diterima.
                         energy = parsed.get("catchedFish", {}).get("energy")
                         if parsed.get("success"):
                             self.log(f"✅ Session succeeded! Caught fish: {fish} | Energy Left: {energy}", Fore.GREEN)
                         else:
                             self.log("❌ Session failed.", Fore.RED)
+                        if not end_sent and len(key_frames) >= required_frames:
+                            end_game()
                         break
 
                 ws.close()
 
-                # After the session completes, subtract the energy cost.
+                # Setelah sesi selesai, kurangi energi.
                 self.energy -= energy_cost
                 self.log(f"⏱️ Session finished. Remaining energy: {self.energy}", Fore.YELLOW)
-                time.sleep(1)  # Optional delay between sessions
+                time.sleep(1)
 
             except Exception as e:
                 self.log(f"❌ Error during fishing session: {e}", Fore.RED)
                 return 0
 
-        # End of fishing sessions.
         return 1
 
     def load_proxies(self, filename="proxy.txt"):
