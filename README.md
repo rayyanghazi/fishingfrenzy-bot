@@ -22,6 +22,14 @@ This bot is built to save you time and streamline your gameplay, allowing you to
 
 ---
 
+## 🎣 Register for Fishing Frenzy
+
+If you don't have a Fishing Frenzy account yet, register now by clicking the link below:
+
+👉 [Register Your Fishing Frenzy Account](https://t.me/fishingfrenzy_bot/fishingfrenzyapp?startapp=HE8W8F)
+
+---
+
 ## 🌟 Version v1.0.2
 
 ### Updates
