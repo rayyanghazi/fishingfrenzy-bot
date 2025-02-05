@@ -81,6 +81,8 @@ This bot is built to save you time and streamline your gameplay, allowing you to
    id|first_username
    ```
 
+   > **Note:** To obtain the `id` and `first_username`, use this bot: [https://t.me/userinfobot](https://t.me/userinfobot)
+
 5. **Set Up Proxies (Mandatory for Multi-Account Usage)**  
    If you are running the bot with multiple accounts, you **must** use proxies. Create a file named `proxy.txt` and add your proxies in the following format:
 
@@ -88,8 +90,8 @@ This bot is built to save you time and streamline your gameplay, allowing you to
    http://username:password@ip:port
    ```
 
-   _Note: Only HTTP and HTTPS proxies are supported._
-
+   > **Note:** Only `HTTP` and `HTTPS` proxies are supported.
+   
 6. **Run the Bot**  
    Start the bot by running:
 
