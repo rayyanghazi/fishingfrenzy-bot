@@ -17,6 +17,8 @@ Fishing Frenzy Bot is designed to automate various tasks in **Fishing Frenzy**, 
 - **Fishing Automation**: Enjoy automatic fishing with configurable types.
 - **Daily Tasks**: Automatically handle daily activities for extra rewards.
 - **Event System**: Automatically switch to the event area (without purchasing event items).
+- **Web Login Support**: Now you can log in via web by searching for the login API.  
+- **Bait Usage**: The bot now automatically uses all available bait variations from your inventory.
 
 This bot is built to save you time and streamline your gameplay, allowing you to focus on strategy and enjoying the game.
 
@@ -24,19 +26,23 @@ This bot is built to save you time and streamline your gameplay, allowing you to
 
 ## 🎣 Register for Fishing Frenzy
 
-If you don't have a Fishing Frenzy account yet, register now by clicking the link below:
+If you don't have a Fishing Frenzy account yet, register now:
 
-👉 [Register Your Fishing Frenzy Account](https://t.me/fishingfrenzy_bot/fishingfrenzyapp?startapp=HE8W8F)
+- **Telegram Registration:**  
+  👉 [Register Your Fishing Frenzy Account](https://t.me/fishingfrenzy_bot/fishingfrenzyapp?startapp=HE8W8F)
+
+- **Web Registration:**  
+  👉 [Register via Web](https://fishingfrenzy.co?code=HE8W8F)
 
 ---
 
-## 🌟 Version v1.0.2
+## 🌟 Version v1.0.3
 
 ### Updates
 
-- **Sushi System Fix:** The sushi system has been corrected for proper functionality.
-- **Auto Claim Daily Quest:** Daily quests are now automatically claimed when completed.
-- **Auto Event System:** Automatically switches to the event area (note: this does not include purchasing event items).
+- **Web Login Support:** The bot now supports logging in via web. When logging in via web, ensure you search for the login API and reset your cookie so that Fishing Frenzy returns to the login menu or logs out. See the sample authentication screen below:  
+  ![Auth Example](auth.png)
+- **Bait Usage:** The bot now uses all available bait items across every variation from your inventory.
 
 ---
 
@@ -83,18 +89,24 @@ If you don't have a Fishing Frenzy account yet, register now by clicking the lin
    ```
 
 4. **Configure Your Query**  
-   Create a file named `query.txt` and paste your query data in the format obtained from the UserInfo Bot:
+   Create a file named `query.txt` and paste your query data in the format obtained from the UserInfo Bot. For web login, you can search for the login API. **Make sure you reset the cookie** so that Fishing Frenzy returns to the login menu or logs out. The query data format is as follows:
 
-   ```
-   id|first_username
-   ```
+   - For Telegram login:  
+     ```
+     id|first_username
+     ```
+   - For web login, simply use the login token (without a `|`):
+
+     ```
+     your_web_login_token_here
+     ```
 
    > **Note:** To obtain the `id` and `first_username`, use this bot: [https://t.me/userinfobot](https://t.me/userinfobot)
 
 5. **Set Up Proxies (Mandatory for Multi-Account Usage)**  
    If you are running the bot with multiple accounts, you **must** use proxies. Create a file named `proxy.txt` and add your proxies in the following format:
 
-   ```
+   ```  
    http://username:password@ip:port
    ```
 

@@ -68,14 +68,19 @@ class fishingfrenzy:
 
     def load_query(self, path_file: str = "query.txt") -> list:
         """
-        Loads a list of queries from the specified file, expecting each line to contain
-        'telegram_id|username_telegram' format.
-
+        Loads a list of queries from the specified file.
+        
+        Jika format baris menggunakan 'telegram_id|username_telegram', 
+        maka akan diperlakukan sebagai login biasa. 
+        Jika tidak terdapat '|', maka dianggap sebagai login via web, 
+        sehingga 'teleUserId' dan 'teleName' di-set ke None dan baris tersebut 
+        akan dianggap sebagai token untuk header 'x-privy-token'.
+        
         Args:
             path_file (str): The path to the query file. Defaults to "query.txt".
-
+        
         Returns:
-            list: A list of tuples (telegram_id, username_telegram, device_id) or an empty list if an error occurs.
+            list: List of tuples (teleUserId, teleName, deviceId, web_token)
         """
         self.banner()
 
@@ -85,18 +90,26 @@ class fishingfrenzy:
                 for line in file:
                     line = line.strip()
                     if line:
-                        parts = line.split("|")
-                        if len(parts) == 2:
-                            device_id = str(uuid.uuid4())  # Generate a unique device ID
-                            queries.append((parts[0].strip(), parts[1].strip(), device_id))
+                        if '|' in line:
+                            # Login dengan kredensial Telegram
+                            parts = line.split("|")
+                            if len(parts) == 2:
+                                device_id = str(uuid.uuid4())  # Generate a unique device ID
+                                # Untuk login biasa, web_token tidak digunakan (None)
+                                queries.append((parts[0].strip(), parts[1].strip(), device_id, None))
+                            else:
+                                self.log(f"⚠️ Invalid format in line: {line}", Fore.YELLOW)
                         else:
-                            self.log(f"⚠️ Invalid format in line: {line}", Fore.YELLOW)
-            
-            if not queries:
-                self.log(f"⚠️ Warning: {path_file} is empty or has invalid entries.", Fore.YELLOW)
+                            # Login via web
+                            device_id = str(uuid.uuid4())
+                            token = line  # Baris tersebut dianggap sebagai token
+                            queries.append((None, None, device_id, token))
+                
+                if not queries:
+                    self.log(f"⚠️ Warning: {path_file} is empty or has invalid entries.", Fore.YELLOW)
 
-            self.log(f"✅ Loaded {len(queries)} valid queries from {path_file}.", Fore.GREEN)
-            return queries
+                self.log(f"✅ Loaded {len(queries)} valid queries from {path_file}.", Fore.GREEN)
+                return queries
 
         except FileNotFoundError:
             self.log(f"❌ File not found: {path_file}", Fore.RED)
@@ -112,18 +125,33 @@ class fishingfrenzy:
             self.log("❌ Invalid login index. Please check again.", Fore.RED)
             return
 
-        teleUserId, teleName, deviceId = self.query_list[index]
-        req_url = f"{self.BASE_URL}auth/guest-login"
+        # Unpack tuple dengan empat elemen:
+        teleUserId, teleName, deviceId, web_token = self.query_list[index]
         
+        # Cek apakah login via web atau login biasa
+        if teleUserId is None or teleName is None:
+            # Login via web
+            self.log("🌐 Logging in via Web (no Telegram credentials provided)", Fore.CYAN)
+            req_url = f"{self.BASE_URL}auth/login"
+        else:
+            # Login dengan kredensial Telegram
+            self.log(f"📋 Logging in as {teleName} (ID: {teleUserId})", Fore.CYAN)
+            req_url = f"{self.BASE_URL}auth/guest-login"
+        
+        # Siapkan payload dan header default
         payload = {
             "deviceId": str(uuid.uuid4()),  # Generate new device ID for each login
-            "teleUserId": int(teleUserId),
-            "teleName": teleName
+            "teleUserId": None,
+            "teleName": None
         }
-        
-        self.log(f"📋 Logging in as {teleName} (ID: {teleUserId})", Fore.CYAN)
-
         headers = {**self.HEADERS}
+        
+        if teleUserId is None or teleName is None:
+            # Untuk login via web, payload tetap dengan None dan tambahkan header x-privy-token
+            headers["x-privy-token"] = web_token
+        else:
+            payload["teleUserId"] = int(teleUserId)
+            payload["teleName"] = teleName
         
         try:
             self.log("📡 Sending request to fetch user information...", Fore.CYAN)
@@ -235,6 +263,7 @@ class fishingfrenzy:
             range_type = "long_range"
             energy_cost = 3
 
+        self.bait()
         self.log(f"🎣 Starting fishing sessions with type: {range_type} (energy cost: {energy_cost}) (your energy: {self.energy})", Fore.CYAN)
 
         # Parameter untuk pengumpulan key frame dan interpolasi.
@@ -870,6 +899,89 @@ class fishingfrenzy:
         except Exception as e:
             self.log(f"❌ An unexpected error occurred: {e}", Fore.RED)
             return 0
+
+    def bait(self) -> int:
+        """
+        Uses all available bait items (all variations) from the inventory.
+        
+        Process:
+        1. Fetch the inventory from {self.BASE_URL}inventory.
+        2. Extract the userId and list_item_info.
+        3. For each bait item in list_item_info that has a quantity > 0,
+        use the bait by making a GET request to:
+            {self.BASE_URL}items/{bait_id}/use?userId={userId}&quantity={bait_quantity}
+        4. If all bait items are used successfully (or if no bait items have quantity > 0),
+        return 1. Otherwise, return 0 in case of any failure.
+        
+        Returns:
+            int: 1 if all bait items were used successfully or none were available,
+                0 if any request fails.
+        """
+        # Step 1: Fetch inventory data
+        req_url_inventory = f"{self.BASE_URL}inventory"
+        headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
+
+        try:
+            self.log("📡 Fetching inventory...", Fore.CYAN)
+            response = requests.get(req_url_inventory, headers=headers)
+            response.raise_for_status()
+            inventory = response.json()
+        except requests.exceptions.RequestException as e:
+            self.log(f"❌ Failed to fetch inventory: {e}", Fore.RED)
+            self.log(f"📄 Response content: {response.text}", Fore.RED)
+            return 0
+        except ValueError as e:
+            self.log(f"❌ Data error while fetching inventory: {e}", Fore.RED)
+            self.log(f"📄 Response content: {response.text}", Fore.RED)
+            return 0
+        except Exception as e:
+            self.log(f"❌ An unexpected error occurred while fetching inventory: {e}", Fore.RED)
+            self.log(f"📄 Response content: {response.text}", Fore.RED)
+            return 0
+
+        # Step 2: Extract userId and bait items
+        user_id = inventory.get("userId")
+        list_item_info = inventory.get("list_item_info", [])
+        if not user_id:
+            self.log("❌ User ID not found in inventory.", Fore.RED)
+            return 0
+
+        # Flag to indicate if at least one bait was processed
+        bait_used = False
+
+        # Step 3: Iterate through each bait variation
+        for bait_item in list_item_info:
+            bait_quantity = bait_item.get("quantity", 0)
+            if bait_quantity > 0:
+                bait_id = bait_item.get("id")
+                bait_name = bait_item.get("name")
+                self.log(f"📋 Using bait: {bait_name} (ID: {bait_id}) with quantity: {bait_quantity}", Fore.CYAN)
+                req_url_use = f"{self.BASE_URL}items/{bait_id}/use?userId={user_id}&quantity={bait_quantity}"
+                try:
+                    self.log("📡 Sending request to use bait...", Fore.CYAN)
+                    response_use = requests.get(req_url_use, headers=headers)
+                    response_use.raise_for_status()
+
+                    if response_use.status_code == 200:
+                        self.log(f"✅ Successfully used {bait_quantity} of {bait_name}.", Fore.GREEN)
+                        bait_used = True
+                    else:
+                        self.log(f"❌ Failed to use {bait_name}. Status: {response_use.status_code}", Fore.RED)
+                        self.log(f"📄 Response: {response_use.text}", Fore.RED)
+                        return 0
+                except requests.exceptions.RequestException as e:
+                    self.log(f"❌ Failed to use {bait_name}: {e}", Fore.RED)
+                    self.log(f"📄 Response content: {response_use.text if response_use is not None else 'No response'}", Fore.RED)
+                    return 0
+                except Exception as e:
+                    self.log(f"❌ An unexpected error occurred while using {bait_name}: {e}", Fore.RED)
+                    self.log(f"📄 Response content: {response_use.text if response_use is not None else 'No response'}", Fore.RED)
+                    return 0
+
+        # Step 4: If no bait items were available or used, log a message and return normally
+        if not bait_used:
+            self.log("ℹ️ No bait items available to use.", Fore.CYAN)
+        return 1
 
 if __name__ == "__main__":
     fishing = fishingfrenzy()
