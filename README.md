@@ -17,7 +17,7 @@ Fishing Frenzy Bot is designed to automate various tasks in **Fishing Frenzy**, 
 - **Fishing Automation**: Enjoy automatic fishing with configurable types.
 - **Daily Tasks**: Automatically handle daily activities for extra rewards.
 - **Event System**: Automatically switch to the event area (without purchasing event items).
-- **Web Login Support**: Now you can log in via web by searching for the login API.  
+- **Web Login Support**: Now you can log in via web by searching for the login API.
 - **Bait Usage**: The bot now automatically uses all available bait variations from your inventory.
 
 This bot is built to save you time and streamline your gameplay, allowing you to focus on strategy and enjoying the game.
@@ -40,8 +40,7 @@ If you don't have a Fishing Frenzy account yet, register now:
 
 ### Updates
 
-- **Web Login Support:** The bot now supports logging in via web. When logging in via web, ensure you search for the login API and reset your cookie so that Fishing Frenzy returns to the login menu or logs out. See the sample authentication screen below:  
-  ![Auth Example](auth.png)
+- **Web Login Support:** The bot now supports logging in via web.
 - **Bait Usage:** The bot now uses all available bait items across every variation from your inventory.
 
 ---
@@ -89,19 +88,33 @@ If you don't have a Fishing Frenzy account yet, register now:
    ```
 
 4. **Configure Your Query**  
-   Create a file named `query.txt` and paste your query data in the format obtained from the UserInfo Bot. For web login, you can search for the login API. **Make sure you reset the cookie** so that Fishing Frenzy returns to the login menu or logs out. The query data format is as follows:
+   Create a file named `query.txt` and paste your query data in the format obtained from the UserInfo Bot. There are two methods to fill this file:
 
-   - For Telegram login:  
+   - **Telegram Login:**  
+     Paste the data in the following format:
      ```
      id|first_username
      ```
-   - For web login, simply use the login token (without a `|`):
 
-     ```
-     your_web_login_token_here
-     ```
+   - **Web Login (Token via Browser Inspection):**  
+     1. **Inspect the Web Page:**  
+        Open your browser and navigate to Fishing Frenzy's login page.  
+        Press `F12` (or right-click and select **Inspect**) to open the developer tools.
+     2. **Go to the Application Tab:**  
+        In the developer tools, click on the **Application** tab. Here you can inspect the cookies and local storage.
+     3. **Locate Your Login Token:**  
+        Find the token by searching for the login API call or the cookie where the token is stored.  
+        > **Important:** Make sure you reset your cookie so that Fishing Frenzy returns to the login menu or logs out.
+     4. **Copy & Paste:**  
+        Copy the token and paste it directly into `query.txt`. For web login, simply paste the token (without a `|`), for example:
+        ```
+        your_web_login_token_here
+        ```
+     5. **Reference Screenshot:**  
+        Below is an example screenshot to guide you:
+        ![Auth Example](auth.png)
 
-   > **Note:** To obtain the `id` and `first_username`, use this bot: [https://t.me/userinfobot](https://t.me/userinfobot)
+   > **Note:** To obtain the `id` and `first_username` for Telegram login, use this bot: [https://t.me/userinfobot](https://t.me/userinfobot)
 
 5. **Set Up Proxies (Mandatory for Multi-Account Usage)**  
    If you are running the bot with multiple accounts, you **must** use proxies. Create a file named `proxy.txt` and add your proxies in the following format:
@@ -137,4 +150,4 @@ This project is developed by **Livexords**. If you have any suggestions, questio
   </a>
 </div>
 
----
+--- 
