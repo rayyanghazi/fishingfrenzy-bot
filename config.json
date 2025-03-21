@@ -1,12 +1,13 @@
 {
-    "proxy": true,
     "quest": true,
     "upgrade_skill": true,
-    "sell_all_fish": true,
-    "event": true,
+    "event": false,
     "fishing": true,
     "fishing_type": 1,
     "daily": true,
+    "sell_all_fish": false,
+    "proxy": true,
+    "thread": 1,
     "delay_loop": 3000,
     "delay_account_switch": 10
 }  

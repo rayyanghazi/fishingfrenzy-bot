@@ -14,53 +14,77 @@ Fishing Frenzy Bot is designed to automate various tasks in **Fishing Frenzy**, 
 - **Quest Automation**: Complete quests and events automatically.
 - **Upgrade Skill**: Automatically upgrade your character's skills.
 - **Sell All Fish**: Sell all your fish without manual intervention.
-- **Fishing Automation**: Enjoy automatic fishing with configurable types.
+- **Fishing Automation**: Enjoy automatic fishing with configurable types and the latest API adjustments for Fishing Frenzy Session 2.
 - **Daily Tasks**: Automatically handle daily activities for extra rewards.
 - **Event System**: Automatically switch to the event area (without purchasing event items).
-- **Web Login Support**: Now you can log in via web by searching for the login API.
+- **Web Login Support**: Log in via web by searching for the login API.
 - **Bait Usage**: The bot now automatically uses all available bait variations from your inventory.
+- **Thread System**: Run tasks concurrently with the new threading system for improved performance.
 
 This bot is built to save you time and streamline your gameplay, allowing you to focus on strategy and enjoying the game.
 
 ---
 
-## 🎣 Register for Fishing Frenzy
+## 🌟 Version Updates
 
-If you don't have a Fishing Frenzy account yet, register now:
+**Current Version: v1.0.4**
 
-- **Telegram Registration:**  
-  👉 [Register Your Fishing Frenzy Account](https://t.me/fishingfrenzy_bot/fishingfrenzyapp?startapp=HE8W8F)
+### Version v1.0.4 Updates:
 
-- **Web Registration:**  
-  👉 [Register via Web](https://fishingfrenzy.co?code=HE8W8F)
+- **API Adjustments for Fishing Frenzy Session 2:**  
+  Enhanced support for the updated fishing session API.
+- **Proxy System:**  
+  Dynamic proxy support is now integrated for each account.
+- **Thread System:**  
+  New threading support to run tasks concurrently.
+- **Login System:**
+  - **Web Login (Guest Only):** The bot currently supports guest login only.
+  - **Upcoming:** Additional login methods via email and wallet are planned.
+- **Bait Usage:**  
+  The bot now uses all available bait items across every variation from your inventory.
 
----
-
-## 🌟 Version v1.0.3
-
-### Updates
-
-- **Web Login Support:** The bot now supports logging in via web.
-- **Bait Usage:** The bot now uses all available bait items across every variation from your inventory.
+> **Upcoming Updates:**
+>
+> - Feature optimization across the board.
+> - Additional features in line with Fishing Frenzy Session 2 updates (e.g., cooking).
 
 ---
 
 ## ⚙️ Configuration (`config.json`)
 
+The configuration file now follows this structure:
+
+```json
+{
+  "quest": true,
+  "upgrade_skill": true,
+  "event": false,
+  "fishing": true,
+  "fishing_type": 1,
+  "daily": true,
+  "sell_all_fish": false,
+  "proxy": true,
+  "thread": 1,
+  "delay_loop": 3000,
+  "delay_account_switch": 10
+}
+```
+
 > **Note:** If you are using more than one account, you **must** use proxies.
 
-| **Setting**            | **Description**                                                              | **Default Value** |
-| ---------------------- | ---------------------------------------------------------------------------- | ----------------- |
-| `proxy`                | **Mandatory for multi-account setups.** Enable proxy usage for each account. | `true`            |
-| `quest`                | Automatically complete quests.                                               | `true`            |
-| `upgrade_skill`        | Automatically upgrade your skills.                                           | `true`            |
-| `sell_all_fish`        | Automatically sell all caught fish.                                          | `true`            |
-| `event`                | Automatically switch to the event area.                                      | `true`            |
-| `fishing`              | Enable automatic fishing.                                                    | `true`            |
-| `fishing_type`         | Set the fishing type (1 for short, 2 for mid, and 3 for long).                | `1`               |
-| `daily`                | Automatically complete daily tasks.                                          | `true`            |
-| `delay_loop`           | Delay (in milliseconds) before the next loop.                               | `3000`            |
-| `delay_account_switch` | Delay (in seconds) between switching accounts.                               | `10`              |
+| **Setting**            | **Description**                                                | **Default Value** |
+| ---------------------- | -------------------------------------------------------------- | ----------------- |
+| `quest`                | Automatically complete quests.                                 | `true`            |
+| `upgrade_skill`        | Automatically upgrade your skills.                             | `true`            |
+| `event`                | Automatically switch to the event area.                        | `false`           |
+| `fishing`              | Enable automatic fishing.                                      | `true`            |
+| `fishing_type`         | Set the fishing type (1 for short, 2 for mid, and 3 for long). | `1`               |
+| `daily`                | Automatically complete daily tasks.                            | `true`            |
+| `sell_all_fish`        | Automatically sell all caught fish.                            | `false`           |
+| `proxy`                | Enable proxy usage for multi-account setups.                   | `true`            |
+| `thread`               | Number of threads to run concurrently.                         | `1`               |
+| `delay_loop`           | Delay (in milliseconds) before the next loop.                  | `3000`            |
+| `delay_account_switch` | Delay (in seconds) between switching accounts.                 | `10`              |
 
 ---
 
@@ -88,38 +112,25 @@ If you don't have a Fishing Frenzy account yet, register now:
    ```
 
 4. **Configure Your Query**  
-   Create a file named `query.txt` and paste your query data in the format obtained from the UserInfo Bot. There are two methods to fill this file:
+   Create a file named `query.txt` and paste your query data in the following format:
 
-   - **Telegram Login:**  
-     Paste the data in the following format:
-     ```
-     id|first_username
-     ```
+   1. **Inspect Fishing Frenzy Web:**  
+      Open your browser, navigate to the Fishing Frenzy login page, and inspect the web page.
+   2. **Locate the Device ID:**  
+      Look in the **Application** tab or check the API calls for your device ID.
+   3. **Guest Login Support:**  
+      The bot currently supports guest login only.
+   4. **Format Your Query:**  
+      Copy your device ID and format it as follows:
 
-   - **Web Login (Token via Browser Inspection):**  
-     1. **Inspect the Web Page:**  
-        Open your browser and navigate to Fishing Frenzy's login page.  
-        Press `F12` (or right-click and select **Inspect**) to open the developer tools.
-     2. **Go to the Application Tab:**  
-        In the developer tools, click on the **Application** tab. Here you can inspect the cookies and local storage.
-     3. **Locate Your Login Token:**  
-        Find the token by searching for the login API call or the cookie where the token is stored.  
-        > **Important:** Make sure you reset your cookie so that Fishing Frenzy returns to the login menu or logs out.
-     4. **Copy & Paste:**  
-        Copy the token and paste it directly into `query.txt`. For web login, simply paste the token (without a `|`), for example:
-        ```
-        your_web_login_token_here
-        ```
-     5. **Reference Screenshot:**  
-        Below is an example screenshot to guide you:
-        ![Auth Example](auth.png)
-
-   > **Note:** To obtain the `id` and `first_username` for Telegram login, use this bot: [https://t.me/userinfobot](https://t.me/userinfobot)
+      ```text
+      deviceid|guest
+      ```
 
 5. **Set Up Proxies (Mandatory for Multi-Account Usage)**  
    If you are running the bot with multiple accounts, you **must** use proxies. Create a file named `proxy.txt` and add your proxies in the following format:
 
-   ```  
+   ```text
    http://username:password@ip:port
    ```
 
@@ -150,4 +161,4 @@ This project is developed by **Livexords**. If you have any suggestions, questio
   </a>
 </div>
 
---- 
+---
