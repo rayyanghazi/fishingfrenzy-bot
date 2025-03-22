@@ -1,0 +1,6 @@
+{
+    "proxy": true,
+    "thread": 1,
+    "delay_loop": 3000,
+    "delay_account_switch": 10
+}  

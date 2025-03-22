@@ -1,3 +1,4 @@
 colorama
 requests
 websocket-client
+fake-useragent

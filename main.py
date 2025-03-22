@@ -29,11 +29,11 @@ class fishingfrenzy:
     }
 
     def __init__(self):
+        self.config = self.load_config()
         self.query_list = self.load_query("query.txt")
         self.access_token = None
         self.refresh_token = None
         self.energy = 0
-        self.config = self.load_config()
         self.reconnect_attempts = 3
         self.reconnect_delay = 5
 
@@ -67,32 +67,47 @@ class fishingfrenzy:
 
     def load_query(self, path_file: str = "query.txt") -> list:
         """
-        Loads a list of queries from the specified file.
+        Loads a list of queries from the specified file. If self.config["run_with_reff"]
+        is True, it also loads queries from "result_reff.txt" and appends them to the list.
 
         Args:
             path_file (str): The path to the query file. Defaults to "query.txt".
 
         Returns:
-            list: A list of queries or an empty list if an error occurs.
+            list: A list of queries combined from the provided file and, optionally, from result_reff.txt.
         """
         self.banner()
 
+        queries = []
         try:
             with open(path_file, "r") as file:
                 queries = [line.strip() for line in file if line.strip()]
-
             if not queries:
                 self.log(f"⚠️ Warning: {path_file} is empty.", Fore.YELLOW)
-
-            self.log(f"✅ Loaded {len(queries)} queries from {path_file}.", Fore.GREEN)
-            return queries
-
+            else:
+                self.log(f"✅ Loaded {len(queries)} queries from {path_file}.", Fore.GREEN)
         except FileNotFoundError:
             self.log(f"❌ File not found: {path_file}", Fore.RED)
-            return []
         except Exception as e:
-            self.log(f"❌ Unexpected error loading queries: {e}", Fore.RED)
-            return []
+            self.log(f"❌ Unexpected error loading queries from {path_file}: {e}", Fore.RED)
+
+        # Jika konfigurasi run_with_reff true, juga muat file result_query.txt
+        if self.config.get("run_with_reff", False):
+            reff_file = "result_query.txt"
+            try:
+                with open(reff_file, "r") as file:
+                    reff_queries = [line.strip() for line in file if line.strip()]
+                if reff_queries:
+                    self.log(f"✅ Loaded {len(reff_queries)} queries from {reff_file}.", Fore.GREEN)
+                    queries.extend(reff_queries)
+                else:
+                    self.log(f"⚠️ Warning: {reff_file} is empty.", Fore.YELLOW)
+            except FileNotFoundError:
+                self.log(f"❌ File not found: {reff_file}", Fore.RED)
+            except Exception as e:
+                self.log(f"❌ Unexpected error loading queries from {reff_file}: {e}", Fore.RED)
+
+        return queries
 
     def login(self, index: int) -> None:
         self.log("🔒 Attempting to log in...", Fore.GREEN)
@@ -101,80 +116,135 @@ class fishingfrenzy:
             self.log("❌ Invalid login index. Please check again.", Fore.RED)
             return
 
-        # Ambil data dari query_list, diharapkan dengan format "deviceId|guest"
+        # Ambil data dari query_list, diharapkan dengan format "value|type" 
+        # dimana type bisa "guest" atau "token"
         raw = self.query_list[index]
         parts = raw.split('|')
-        device_id = parts[0]
+        if len(parts) < 2:
+            self.log("❌ Invalid format. Expected format: <value>|<guest/token>", Fore.RED)
+            return
 
-        # Karena hanya mendukung login via web (guest), kita gunakan endpoint auth/guest-login
-        self.log("🌐 Logging in via Web (guest login)", Fore.CYAN)
-        req_url = f"{self.BASE_URL}auth/guest-login"
+        login_type = parts[1].strip().lower()
+        
+        if login_type == "guest":
+            device_id = parts[0].strip()
+            self.log("🌐 Logging in via Web", Fore.CYAN)
+            req_url = f"{self.BASE_URL}auth/guest-login"
 
-        # Payload hanya memuat deviceId
-        payload = {
-            "deviceId": device_id
-        }
-        # Tidak perlu menambahkan header x-privy-token untuk guest login
-        headers = {**self.HEADERS}
+            # Payload hanya memuat deviceId
+            payload = {
+                "deviceId": device_id
+            }
+            headers = {**self.HEADERS}
 
-        try:
-            self.log("📡 Sending request to fetch user information...", Fore.CYAN)
-            response = requests.post(req_url, headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
+            try:
+                self.log("📡 Sending request to fetch user information...", Fore.CYAN)
+                response = requests.post(req_url, headers=headers, json=payload)
+                response.raise_for_status()
+                data = response.json()
 
-            access_token = data["tokens"].get("access", {}).get("token")
-            refresh_token = data["tokens"].get("refresh", {}).get("token")
-            if access_token and refresh_token:
-                self.access_token = access_token
-                self.refresh_token = refresh_token
-                self.log("🔑 Access token and refresh token successfully retrieved.", Fore.GREEN)
-            else:
-                self.log("⚠️ Access token and refresh token not found in response.", Fore.YELLOW)
-                return
+                access_token = data["tokens"].get("access", {}).get("token")
+                refresh_token = data["tokens"].get("refresh", {}).get("token")
+                if access_token and refresh_token:
+                    self.access_token = access_token
+                    self.refresh_token = refresh_token
+                    self.log("🔑 Access token and refresh token successfully retrieved.", Fore.GREEN)
+                else:
+                    self.log("⚠️ Access token and refresh token not found in response.", Fore.YELLOW)
+                    return
 
-            # Verify token request
+                # Verifikasi token yang baru didapat
+                verify_url = f"{self.BASE_URL}auth/verify-tokens"
+                verify_payload = {"accessToken": self.access_token}
+                verify_headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
+
+                self.log("🔍 Verifying access token...", Fore.CYAN)
+                verify_response = requests.post(verify_url, headers=verify_headers, json=verify_payload)
+                if verify_response.status_code == 200:
+                    self.log("✅ Access token successfully verified.", Fore.GREEN)
+                    self.access_token = verify_response.json()['access'].get('token', self.access_token)
+                else:
+                    self.log(f"❌ Token verification failed. Status: {verify_response.status_code}", Fore.RED)
+                    self.log(f"📄 Response: {verify_response.text}", Fore.RED)
+                    return
+
+                user_info = data.get("user", {})
+                self.energy = user_info.get('energy')
+                if user_info:
+                    self.log("✅ Login successful!", Fore.GREEN)
+                    self.log(f"🆔 User ID: {user_info.get('userPrivyId')}", Fore.LIGHTCYAN_EX)
+                    self.log(f"👤 Role: {user_info.get('role')}", Fore.LIGHTCYAN_EX)
+                    self.log(f"💰 Gold: {user_info.get('gold')}", Fore.YELLOW)
+                    self.log(f"⚡ Energy: {user_info.get('energy')}", Fore.YELLOW)
+                    self.log(f"🐟 Fish Points: {user_info.get('fishPoint')}", Fore.YELLOW)
+                    self.log(f"⭐ EXP: {user_info.get('exp')}", Fore.YELLOW)
+                    self.log(f"🎁 Today's Reward: {user_info.get('todayReward')}", Fore.YELLOW)
+                    self.log(f"📅 Last Login: {user_info.get('lastLoginTime')}", Fore.LIGHTCYAN_EX)
+                else:
+                    self.log("⚠️ Unexpected response structure.", Fore.YELLOW)
+
+            except requests.exceptions.RequestException as e:
+                self.log(f"❌ Failed to send login request: {e}", Fore.RED)
+                self.log(f"📄 Response content: {response.text}", Fore.RED)
+            except ValueError as e:
+                self.log(f"❌ Data error (possible JSON issue): {e}", Fore.RED)
+                self.log(f"📄 Response content: {response.text}", Fore.RED)
+            except KeyError as e:
+                self.log(f"❌ Key error: {e}", Fore.RED)
+                self.log(f"📄 Response content: {response.text}", Fore.RED)
+            except Exception as e:
+                self.log(f"❌ Unexpected error: {e}", Fore.RED)
+                self.log(f"📄 Response content: {response.text}", Fore.RED)
+
+        elif login_type == "token":
+            # Langsung menggunakan token yang diberikan untuk verifikasi
+            self.access_token = parts[0].strip()
             verify_url = f"{self.BASE_URL}auth/verify-tokens"
             verify_payload = {"accessToken": self.access_token}
             verify_headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
 
-            self.log("🔍 Verifying access token...", Fore.CYAN)
-            verify_response = requests.post(verify_url, headers=verify_headers, json=verify_payload)
+            try:
+                self.log("🔍 Verifying provided access token...", Fore.CYAN)
+                verify_response = requests.post(verify_url, headers=verify_headers, json=verify_payload)
+                if verify_response.status_code == 200:
+                    self.log("✅ Access token successfully verified.", Fore.GREEN)
+                    self.access_token = verify_response.json()['access'].get('token', self.access_token)
+                else:
+                    self.log(f"❌ Token verification failed. Status: {verify_response.status_code}", Fore.RED)
+                    self.log(f"📄 Response: {verify_response.text}", Fore.RED)
+                    return
 
-            if verify_response.status_code == 200:
-                self.log("✅ Access token successfully verified.", Fore.GREEN)
-                self.access_token = verify_response.json()['access'].get('token', None)
-            else:
-                self.log(f"❌ Token verification failed. Status: {verify_response.status_code}", Fore.RED)
-                self.log(f"📄 Response: {verify_response.text}", Fore.RED)
+                # Mengambil informasi user dari response verifikasi (jika tersedia)
+                user_info = verify_response.json().get("user", {})
+                self.energy = user_info.get('energy')
+                if user_info:
+                    self.log("✅ Login successful!", Fore.GREEN)
+                    self.log(f"🆔 User ID: {user_info.get('userPrivyId')}", Fore.LIGHTCYAN_EX)
+                    self.log(f"👤 Role: {user_info.get('role')}", Fore.LIGHTCYAN_EX)
+                    self.log(f"💰 Gold: {user_info.get('gold')}", Fore.YELLOW)
+                    self.log(f"⚡ Energy: {user_info.get('energy')}", Fore.YELLOW)
+                    self.log(f"🐟 Fish Points: {user_info.get('fishPoint')}", Fore.YELLOW)
+                    self.log(f"⭐ EXP: {user_info.get('exp')}", Fore.YELLOW)
+                    self.log(f"🎁 Today's Reward: {user_info.get('todayReward')}", Fore.YELLOW)
+                    self.log(f"📅 Last Login: {user_info.get('lastLoginTime')}", Fore.LIGHTCYAN_EX)
+                else:
+                    self.log("⚠️ Unexpected response structure.", Fore.YELLOW)
 
-            user_info = data.get("user", {})
-            self.energy = user_info.get('energy')
-            if user_info:
-                self.log("✅ Login successful!", Fore.GREEN)
-                self.log(f"🆔 User ID: {user_info.get('userPrivyId')}", Fore.LIGHTCYAN_EX)
-                self.log(f"👤 Role: {user_info.get('role')}", Fore.LIGHTCYAN_EX)
-                self.log(f"💰 Gold: {user_info.get('gold')}", Fore.YELLOW)
-                self.log(f"⚡ Energy: {user_info.get('energy')}", Fore.YELLOW)
-                self.log(f"🐟 Fish Points: {user_info.get('fishPoint')}", Fore.YELLOW)
-                self.log(f"⭐ EXP: {user_info.get('exp')}", Fore.YELLOW)
-                self.log(f"🎁 Today's Reward: {user_info.get('todayReward')}", Fore.YELLOW)
-                self.log(f"📅 Last Login: {user_info.get('lastLoginTime')}", Fore.LIGHTCYAN_EX)
-            else:
-                self.log("⚠️ Unexpected response structure.", Fore.YELLOW)
+            except requests.exceptions.RequestException as e:
+                self.log(f"❌ Failed to send verify request: {e}", Fore.RED)
+                self.log(f"📄 Response content: {verify_response.text}", Fore.RED)
+            except ValueError as e:
+                self.log(f"❌ Data error (possible JSON issue): {e}", Fore.RED)
+                self.log(f"📄 Response content: {verify_response.text}", Fore.RED)
+            except KeyError as e:
+                self.log(f"❌ Key error: {e}", Fore.RED)
+                self.log(f"📄 Response content: {verify_response.text}", Fore.RED)
+            except Exception as e:
+                self.log(f"❌ Unexpected error: {e}", Fore.RED)
+                self.log(f"📄 Response content: {verify_response.text}", Fore.RED)
 
-        except requests.exceptions.RequestException as e:
-            self.log(f"❌ Failed to send login request: {e}", Fore.RED)
-            self.log(f"📄 Response content: {response.text}", Fore.RED)
-        except ValueError as e:
-            self.log(f"❌ Data error (possible JSON issue): {e}", Fore.RED)
-            self.log(f"📄 Response content: {response.text}", Fore.RED)
-        except KeyError as e:
-            self.log(f"❌ Key error: {e}", Fore.RED)
-            self.log(f"📄 Response content: {response.text}", Fore.RED)
-        except Exception as e:
-            self.log(f"❌ Unexpected error: {e}", Fore.RED)
-            self.log(f"📄 Response content: {response.text}", Fore.RED)
+        else:
+            self.log("❌ Unknown login type. Use 'guest' or 'token' after the '|' delimiter.", Fore.RED)
 
     def daily(self) -> int:
         """Claims the daily rewards from the server."""
@@ -257,52 +327,57 @@ class fishingfrenzy:
             try:
                 self.log("📡 Connecting to WebSocket server...", Fore.CYAN)
                 ws = websocket.create_connection(ws_url)
+                ws.settimeout(3)  # Set timeout agar recv() tidak selalu blocking
                 self.log("✅ Connected to WebSocket server.", Fore.GREEN)
 
-                # List to store key frames received from "gameState" messages.
+                # List untuk menyimpan key frames yang diterima dari pesan "gameState".
                 key_frames = []
-                end_sent = False  # Flag to ensure "end" is sent only once
+                end_sent = False  # Flag untuk memastikan "end" hanya dikirim sekali
 
-                # Functions for calculating positions based on frame and direction.
+                # Waktu terakhir pesan diterima
+                last_message_time = time.time()
+                max_idle_time = 10  # waktu maksimal (detik) untuk menunggu pesan baru
+
+                # Fungsi untuk menghitung posisi berdasarkan frame dan direction.
                 def calculate_position_x(frame: int, direction: int) -> int:
                     return 450 + frame * 2 + direction * 5
 
                 def calculate_position_y(frame: int, direction: int) -> int:
                     return 426 + frame * 2 - direction * 3
 
-                # Function to send "prepare" command.
+                # Fungsi untuk mengirim perintah "prepare".
                 def start_new_game():
                     prepare_msg = json.dumps({"cmd": "prepare", "range": range_type})
                     ws.send(prepare_msg)
                     self.log("📡 Sent 'prepare' command. Getting ready for fishing...", Fore.CYAN)
 
-                # Function to send the "end" command after interpolating the key frames.
+                # Fungsi untuk mengirim perintah "end" setelah interpolasi key frames.
                 def end_game():
                     nonlocal end_sent
                     if end_sent:
                         return
                     end_sent = True
 
-                    # If there is only one key frame, no interpolation is needed.
+                    # Jika hanya ada satu key frame, tidak perlu interpolasi.
                     if len(key_frames) < 2:
                         final_frames = key_frames.copy()
                     else:
                         final_frames = []
-                        # Add the first key frame.
+                        # Tambahkan key frame pertama.
                         final_frames.append(key_frames[0])
-                        # Interpolate between key frames.
+                        # Lakukan interpolasi antar key frame.
                         for i in range(1, len(key_frames)):
                             prev = key_frames[i - 1]
                             curr = key_frames[i]
-                            # Use only coordinates for interpolation.
+                            # Gunakan hanya koordinat untuk interpolasi.
                             p0 = prev[0:2]
                             p1 = curr[0:2]
                             interpolated_pts = interpolate_points(p0, p1, interpolation_steps)
                             final_frames.extend(interpolated_pts)
-                            # Append the current key frame (full data if available).
+                            # Tambahkan key frame saat ini.
                             final_frames.append(curr)
                     
-                    fps_value = 20  # as per the example payload
+                    fps_value = 20  # sesuai contoh payload
                     self.log(f"📡 Final frame data (frs) contains {len(final_frames)} points from {len(key_frames)} key frames.", Fore.CYAN)
                     end_payload = {
                         "cmd": "end",
@@ -318,17 +393,26 @@ class fishingfrenzy:
                     ws.send(json.dumps(end_payload))
                     time.sleep(1)
 
-                # Start the session by sending the "prepare" command.
+                # Mulai sesi dengan mengirim perintah "prepare".
                 start_new_game()
 
-                # Loop to receive messages from the server.
+                # Loop untuk menerima pesan dari server.
                 while True:
                     try:
                         message = ws.recv()
+                        last_message_time = time.time()  # update waktu pesan diterima
                     except websocket.WebSocketTimeoutException:
+                        # Cek jika sudah terlalu lama tidak ada pesan masuk.
+                        if time.time() - last_message_time > max_idle_time:
+                            self.log("⚠️ No response received within idle time. Breaking out of loop.", Fore.YELLOW)
+                            break
                         continue
 
                     if not message:
+                        # Cek juga waktu idle jika pesan kosong.
+                        if time.time() - last_message_time > max_idle_time:
+                            self.log("⚠️ No message content received for a while. Breaking out of loop.", Fore.YELLOW)
+                            break
                         continue
 
                     try:
@@ -339,13 +423,17 @@ class fishingfrenzy:
 
                     msg_type = parsed.get("type")
                     if msg_type == "initGame":
-                        # Game initialization message.
+                        # Pesan inisialisasi game.
                         start_msg = json.dumps({"cmd": "start"})
                         ws.send(start_msg)
                         self.log("📡 Sent 'start' command. Fishing started...", Fore.CYAN)
 
                     elif msg_type == "gameState":
-                        # Process gameState message as a key frame.
+                        # Jika "end" sudah dikirim, abaikan pesan key frame berikutnya.
+                        if end_sent:
+                            continue
+
+                        # Proses pesan gameState sebagai key frame.
                         frame = parsed.get("frame", 0)
                         direction = parsed.get("dir", 0)
                         x = calculate_position_x(frame, direction)
@@ -359,13 +447,13 @@ class fishingfrenzy:
                             self.log(f"🎯 Received key frame (coordinates only): {entry}", Fore.MAGENTA)
                         key_frames.append(entry)
 
-                        # If 10 key frames are received, send the "end" command.
+                        # Jika sudah menerima 10 key frames, kirim perintah "end".
                         if len(key_frames) == required_frames:
                             self.log("⚠️ Reached 10 key frames. Sending 'end' message...", Fore.YELLOW)
                             end_game()
 
                     elif msg_type == "gameOver":
-                        # Received gameOver message.
+                        # Pesan gameOver dari server.
                         if parsed.get("success"):
                             self.log("✅ Session succeeded!", Fore.GREEN)
                             catched = parsed.get("catchedFish", {})
@@ -382,14 +470,14 @@ class fishingfrenzy:
                                 self.log("⚠️ No fish data received.", Fore.YELLOW)
                         else:
                             self.log("❌ Session failed.", Fore.RED)
-                        # Ensure that "end" is sent if not already and if key frames are sufficient.
+                        # Pastikan "end" dikirim bila belum dan key frame sudah mencukupi.
                         if not end_sent and len(key_frames) >= required_frames:
                             end_game()
                         break
 
                 ws.close()
 
-                # After the session, deduct energy.
+                # Setelah sesi selesai, kurangi energi.
                 self.energy -= energy_cost
                 self.log(f"⏱️ Session finished. Remaining energy: {self.energy}", Fore.YELLOW)
                 time.sleep(1)
@@ -519,30 +607,124 @@ class fishingfrenzy:
                 websocket.create_connection = self._original_websocket_create_connection
         
     def sell_all_fish(self) -> int:
-        """Sells all fish in the inventory."""
-        req_url_sell = f"{self.BASE_URL}fish/sellAll"
+        """
+        Sells all fish in the inventory by:
+        1. Mengambil data inventory dengan GET request ke {self.BASE_URL}inventory.
+        2. Mengambil list ikan dari field "list_fish_info" -> "inGame".
+        3. Untuk setiap ikan, melakukan POST request ke {self.BASE_URL}fish/sell dengan payload:
+            {"fishInfoId": <id_ikan>, "quantity": <quantity_ikan>}
+        
+        Menggunakan header yang sama dengan tambahan "authorization". 
+        Jika semua ikan berhasil dijual, fungsi akan mengembalikan 1, sebaliknya akan mengembalikan 0.
+        """
+        # URL inventory
+        req_url_inventory = f"{self.BASE_URL}inventory"
+        headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
+        
+        # --- FETCH INVENTORY ---
+        try:
+            self.log("📡 Fetching inventory...", Fore.CYAN)
+            inv_response = requests.get(req_url_inventory, headers=headers)
+            inv_response.raise_for_status()
+            inventory_data = inv_response.json()
+            self.log("✅ Inventory fetched successfully.", Fore.GREEN)
+        except requests.exceptions.RequestException as e:
+            self.log(f"❌ Error fetching inventory: {e}", Fore.RED)
+            return 0
+        
+        # Ambil list ikan dari inventory (bagian "inGame")
+        fish_list = inventory_data.get("list_fish_info", {}).get("inGame", [])
+        if not fish_list:
+            self.log("ℹ️ No fish found in inventory.", Fore.MAGENTA)
+            return 1  # Tidak ada ikan yang harus dijual
+        
+        sell_all_success = True
+        sell_url = f"{self.BASE_URL}fish/sell"
+        
+        # --- ITERASI DAN JUAL IKAN ---
+        for fish in fish_list:
+            fish_id = fish.get("id")
+            quantity = fish.get("quantity")
+            fish_name = fish.get("fishName", "Unknown")
+            if not fish_id or not quantity:
+                self.log("❌ Fish with missing ID or quantity found, skipping...", Fore.RED)
+                continue
+            
+            payload = {
+                "fishInfoId": fish_id,
+                "quantity": quantity
+            }
+            
+            try:
+                self.log(f"📡 Selling fish {fish_name} (ID: {fish_id}) with quantity {quantity}...", Fore.CYAN)
+                sell_response = requests.post(sell_url, headers=headers, json=payload)
+                sell_response.raise_for_status()
+                if sell_response.status_code == 200:
+                    self.log(f"✅ Fish {fish_name} sold successfully.", Fore.GREEN)
+                else:
+                    self.log(f"❌ Failed to sell fish {fish_name}. Status: {sell_response.status_code}", Fore.RED)
+                    sell_all_success = False
+            except requests.exceptions.RequestException as e:
+                self.log(f"❌ Error selling fish {fish_name}: {e}", Fore.RED)
+                sell_all_success = False
+        
+        return 1 if sell_all_success else 0
+    
+    def battle_pass(self) -> int:
+        """
+        Checks the user's Battle Pass status and automatically claims available FREE rewards.
+        
+        Steps:
+        1. Retrieve battle pass data via GET {self.BASE_URL}battle-pass.
+        2. Loop through the 'milestones' list and check if any milestone's free reward is claimable 
+        (i.e. status is "Unclaimed" and claimedFree is False).
+        3. For each eligible milestone, send a POST request to {self.BASE_URL}battle-pass/claim-reward
+        with payload: {"battlePassId": <battlePassId>, "level": <level>, "rewardType": "FREE"}.
+        4. Logs the result for each claim and returns 1 if the process is completed.
+        
+        Returns:
+            int: 1 if the claim process has been executed (even if no claimable rewards), 0 if error occurs.
+        """
+        battle_pass_url = f"{self.BASE_URL}battle-pass"
         headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
 
         try:
-            self.log("🟡 Selling all fish...", Fore.CYAN)
-            response = requests.get(req_url_sell, headers=headers)
+            self.log("📡 Checking battle pass status...", Fore.CYAN)
+            response = requests.get(battle_pass_url, headers=headers)
             response.raise_for_status()
+            bp_data = response.json()
 
-            if response.status_code == 200:
-                data = response.json()
-                if not data.get("list_fish_info", {}).get("inGame", []):
-                    self.log("✅ All fish successfully sold.", Fore.GREEN)
-                    return 1
-                else:
-                    self.log("❌ Some fish were not sold.", Fore.RED)
-                    return 0
-            else:
-                self.log(f"❌ Failed to sell fish. Status: {response.status_code}", Fore.RED)
-                self.log(f"📄 Response: {response.text}", Fore.RED)
+            # Ambil battlePassId dan milestones dari response
+            bp_id = bp_data.get("battlePassId")
+            milestones = bp_data.get("milestones", [])
+            claimed_count = 0
+
+            if not bp_id:
+                self.log("❌ Battle pass ID not found.", Fore.RED)
                 return 0
 
+            # Loop melalui tiap milestone untuk claim reward FREE jika belum diklaim
+            for milestone in milestones:
+                # Pastikan reward free belum diklaim dan statusnya "Unclaimed"
+                if milestone.get("status") == "Unclaimed" and not milestone.get("claimedFree", True):
+                    level = milestone.get("level")
+                    payload = {
+                        "battlePassId": bp_id,
+                        "level": level,
+                        "rewardType": "FREE"
+                    }
+                    claim_url = f"{self.BASE_URL}battle-pass/claim-reward"
+                    claim_response = requests.post(claim_url, headers=headers, json=payload)
+                    claim_response.raise_for_status()
+                    self.log(f"✅ Claimed FREE reward for level {level}.", Fore.GREEN)
+                    claimed_count += 1
+
+            if claimed_count == 0:
+                self.log("ℹ️ No FREE rewards available to claim.", Fore.YELLOW)
+            return 1
+
         except requests.exceptions.RequestException as e:
-            self.log(f"❌ Failed to sell fish: {e}", Fore.RED)
+            self.log(f"❌ Failed to process battle pass claim: {e}", Fore.RED)
             return 0
         except ValueError as e:
             self.log(f"❌ Data error: {e}", Fore.RED)
@@ -558,9 +740,9 @@ class fishingfrenzy:
         Steps:
         1. Checks the user's inventory.
         2. Uses available Sushi to restore energy (each Sushi restores a certain amount).
-        3. If the Sushi count is low (less than 5), attempts to purchase more,
-            provided the user has enough gold.
-            
+        3. If the Sushi count is low (less than 5) and energy belum penuh, attempts to purchase more,
+        kemudian langsung menggunakan sushi yang baru dibeli.
+        
         Note:
         - The Sushi item is identified by the fixed ID "668d070357fb368ad9e91c8a".
         - Assumes a maximum energy of 30.
@@ -596,44 +778,61 @@ class fishingfrenzy:
             else:
                 self.log("ℹ️ Sushi item not found in your inventory. Assuming 0 available.", Fore.YELLOW)
                 sushi_quantity = 0
-                # Set default values if Sushi is not found (you can adjust these as needed)
+                # Set default values if Sushi is not found
                 sushi_effect = 5     # Default energy restored per sushi
                 sushi_price = 500    # Default price in gold
+
+            # Fungsi untuk langsung pakai sushi (gunakan satu per satu)
+            def use_sushi(times: int) -> None:
+                nonlocal energy
+                for _ in range(times):
+                    req_url_use_sushi = f"{self.BASE_URL}items/{sushi_id}/use?userId={user_id}&quantity=1"
+                    use_response = requests.get(req_url_use_sushi, headers=headers)
+                    use_response.raise_for_status()
+                    data_use = use_response.json()
+                    energy = data_use.get('energy', energy)
+                    self.energy = energy
+                if times > 0:
+                    self.log(f"✅ Used {times} Sushi to restore energy. Current energy: {energy}", Fore.GREEN)
 
             # Calculate how much energy is needed
             energy_needed = max_energy - energy
             if energy_needed > 0:
-                # Determine the number of Sushi needed based on its effect
+                # Tentukan berapa sushi yang diperlukan (gunakan pembagian integer)
                 needed_sushi = energy_needed // sushi_effect
-                # Use only as many as available in the inventory
+                if energy_needed % sushi_effect != 0:
+                    needed_sushi += 1
+                # Gunakan sushi yang tersedia di inventory
                 used_sushi = min(sushi_quantity, needed_sushi)
                 if used_sushi > 0:
-                    for _ in range(used_sushi):
-                        req_url_use_sushi = f"{self.BASE_URL}items/{sushi_id}/use?userId={user_id}&quantity=1"
-                        use_response = requests.get(req_url_use_sushi, headers=headers)
-                        use_response.raise_for_status()
-                        data = use_response.json()
-                        self.energy = data.get('energy', 0)
-                    self.log(f"✅ Used {used_sushi} Sushi to restore energy.", Fore.GREEN)
+                    use_sushi(used_sushi)
+                    sushi_quantity -= used_sushi
                 else:
                     self.log("ℹ️ Not enough Sushi in inventory to restore energy.", Fore.YELLOW)
             else:
                 self.log("ℹ️ Your energy is already full.", Fore.YELLOW)
 
-            # If there is no Sushi or the quantity is low, attempt to buy more (up to 5)
-            if sushi_quantity < 5:
-                # Calculate how many Sushi the user can buy with their available gold
+            # Jika energi belum penuh dan jumlah sushi kurang dari 5, coba beli dan langsung pakai
+            if self.energy < max_energy and sushi_quantity < 5:
                 max_buyable = gold // sushi_price if sushi_price > 0 else 0
                 if max_buyable > 0:
-                    buy_quantity = min(max_buyable, 5)
+                    # Beli sushi hingga maksimal 5 buah (atau sesuai kebutuhan untuk full energy)
+                    needed_after = max_energy - self.energy
+                    needed_sushi_after = needed_after // sushi_effect
+                    if needed_after % sushi_effect != 0:
+                        needed_sushi_after += 1
+                    buy_quantity = min(max_buyable, 5, needed_sushi_after)
                     req_url_buy_sushi = f"{self.BASE_URL}items/{sushi_id}/buy?userId={user_id}&quantity={buy_quantity}"
                     buy_response = requests.get(req_url_buy_sushi, headers=headers)
                     buy_response.raise_for_status()
                     self.log(f"✅ Purchased {buy_quantity} Sushi.", Fore.GREEN)
-                    return 1
+                    # Setelah beli, langsung gunakan sushi tersebut
+                    use_sushi(buy_quantity)
                 else:
                     self.log("❌ Not enough gold to buy Sushi.", Fore.RED)
                     return 0
+
+            return 1
 
         except requests.exceptions.RequestException as e:
             self.log(f"❌ Failed to process sushi transactions: {e}", Fore.RED)
@@ -768,15 +967,15 @@ class fishingfrenzy:
         """
         Fetches the list of social quests from the server and then attempts to verify each quest.
         Additionally, it fetches the list of daily quests and claims those that are completed but not yet claimed.
-
-        The function uses self.HEADERS and self.access_token for authentication. It first sends a GET request 
-        to retrieve the social quests and then verifies each quest via a POST request. After that, it retrieves
-        the daily quests from {self.BASE_URL}user-quests and sends a POST request to claim each eligible daily quest.
-
+        
+        Setelah proses verifikasi social quest, fungsi akan melakukan request ulang untuk mendapatkan
+        data social quest yang terbaru dan melakukan claim pada quest yang sudah terverifikasi namun belum di-claim.
+        
         Returns:
-            A dictionary with three keys:
-                - "quests": the list of social quests fetched from the server.
+            A dictionary with four keys:
+                - "quests": the original list of social quests fetched from the server.
                 - "verification_results": a list of results from verifying each social quest.
+                - "social_claim_results": a list of results from claiming each verified social quest.
                 - "daily_claim_results": a list of results from claiming each daily quest.
         """
 
@@ -788,6 +987,7 @@ class fishingfrenzy:
         get_headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
         
         verification_results = []
+        social_claim_results = []
         daily_claim_results = []
         
         # --- SOCIAL QUESTS FETCH AND VERIFICATION ---
@@ -825,6 +1025,36 @@ class fishingfrenzy:
                 self.log(f"❌ Error verifying quest {quest_id}: {e}", Fore.RED)
                 verification_results.append({"id": quest_id, "result": None})
         
+        # --- SOCIAL QUESTS RE-FETCH AND CLAIMING ---
+        try:
+            self.log("📡 Re-fetching social quests after verification...", Fore.CYAN)
+            refetch_response = requests.get(social_quests_url, headers=get_headers)
+            refetch_response.raise_for_status()
+            updated_quests = refetch_response.json()
+            self.log("✅ Social quests re-fetched successfully.", Fore.GREEN)
+        except requests.exceptions.RequestException as e:
+            self.log(f"❌ Error re-fetching social quests: {e}", Fore.RED)
+            updated_quests = []
+
+        # Iterate over the updated social quests and claim the ones that are verified but not yet claimed.
+        for quest in updated_quests:
+            quest_id = quest.get("id")
+            if quest.get("status") == "UnClaimed":
+                claim_url = f"{social_quests_url}/{quest_id}/claim"
+                try:
+                    self.log(f"📡 Claiming verified social quest with ID {quest_id}...", Fore.CYAN)
+                    claim_response = requests.post(claim_url, headers=get_headers)
+                    claim_response.raise_for_status()
+                    if claim_response.status_code == 200:
+                        self.log(f"✅ Social quest {quest_id} claimed successfully.", Fore.GREEN)
+                        social_claim_results.append({"id": quest_id, "claimed": True})
+                    else:
+                        self.log(f"❌ Failed to claim social quest {quest_id}. Status Code: {claim_response.status_code}", Fore.RED)
+                        social_claim_results.append({"id": quest_id, "claimed": False})
+                except requests.exceptions.RequestException as e:
+                    self.log(f"❌ Error claiming social quest {quest_id}: {e}", Fore.RED)
+                    social_claim_results.append({"id": quest_id, "claimed": False})
+        
         # --- DAILY QUESTS FETCH AND CLAIMING ---
         try:
             self.log("📡 Fetching daily quests...", Fore.CYAN)
@@ -839,7 +1069,7 @@ class fishingfrenzy:
         # Iterate over the daily quests and claim the ones that are completed but not yet claimed.
         for dq in daily_quests:
             # Check if the quest is a daily quest, is completed, and not yet claimed.
-            if dq.get("periodType") == "Daily" and dq.get("isCompleted") and not dq.get("isClaimed"):
+            if dq.get("isCompleted") and not dq.get("isClaimed"):
                 quest_id = dq.get("id")
                 claim_url = f"{daily_quests_url}/{quest_id}/claim"
                 try:
@@ -859,12 +1089,13 @@ class fishingfrenzy:
         return {
             "quests": quests,
             "verification_results": verification_results,
+            "social_claim_results": social_claim_results,
             "daily_claim_results": daily_claim_results
         }
 
     def event(self) -> int:
         """Switches to the event theme."""
-        req_url_event = f"{self.BASE_URL}events/678dc76a4083a7ae27297826/themes/678dc77c4083a7ae27297828/switch"
+        req_url_event = f"{self.BASE_URL}events/6780f4c7a48b6c2b29d82bf6/themes/6752b7a7ef93f2489cfef709/switch"
         headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
 
         try:
@@ -972,6 +1203,127 @@ class fishingfrenzy:
         if not bait_used:
             self.log("ℹ️ No bait items available to use.", Fore.CYAN)
         return 1
+    
+    def cooking(self) -> int:
+        """
+        Checks active cooking recipes and cooks one if the user has sufficient fish ingredients.
+        
+        Steps:
+        1. Retrieve active cooking recipes from GET {self.BASE_URL}cooking-recipes/active.
+        2. Retrieve user inventory from GET {self.BASE_URL}inventory.
+        3. From the list of recipes, select one that is active and where the recipe's unlockLevel 
+        is less than or equal to the user's cooking level. Also, check that all required fish
+        components are available in sufficient quantity.
+        For each component, the fish used is taken from the inventory's userItemIds.
+        4. If a recipe is found, send a POST request to {self.BASE_URL}cooking-recipes/claim with payload:
+        {
+            "cookingRecipeId": <recipe_id>,
+            "quantity": 1,
+            "fishs": [list of userItemIds used for each component],
+            "shinyFishs": [],
+            "transactionHash": None
+        }
+        5. Log the result and return 1 if executed; otherwise, log and return 0 in case of error.
+        """
+        recipes_url = f"{self.BASE_URL}cooking-recipes/active"
+        inventory_url = f"{self.BASE_URL}inventory"
+        headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
+        
+        try:
+            self.log("📡 Retrieving active cooking recipes...", Fore.CYAN)
+            recipes_response = requests.get(recipes_url, headers=headers)
+            recipes_response.raise_for_status()
+            recipes_data = recipes_response.json()  # Expecting a list of recipes
+
+            self.log("📡 Retrieving inventory...", Fore.CYAN)
+            inv_response = requests.get(inventory_url, headers=headers)
+            inv_response.raise_for_status()
+            inv_data = inv_response.json()
+
+            # Ambil level cooking user (misalnya disimpan di 'level')
+            user_cooking_level = inv_data.get("level", 0)
+            self.log(f"ℹ️ User cooking level: {user_cooking_level}", Fore.LIGHTCYAN_EX)
+
+            # Buat mapping inventory ikan dari list_fish_info/inGame agar mudah dicari berdasarkan id
+            inventory_fish = {}
+            for fish in inv_data.get("list_fish_info", {}).get("inGame", []):
+                fish_id = fish.get("id")
+                if fish_id:
+                    # Salin data untuk mengubah quantity dan daftar userItemIds tanpa mempengaruhi data asli
+                    inventory_fish[fish_id] = {
+                        "quantity": fish.get("quantity", 0),
+                        "userItemIds": list(fish.get("userItemIds", []))
+                    }
+
+            # Fungsi untuk mengecek apakah semua komponen pada resep terpenuhi
+            def can_cook_recipe(recipe):
+                required_fish_ids = []  # Akan diisi dengan userItemId untuk tiap komponen yang digunakan
+                for comp in recipe.get("components", []):
+                    comp_id = comp.get("id")
+                    comp_qty = comp.get("quantity", 1)
+                    inv_item = inventory_fish.get(comp_id)
+                    if not inv_item or inv_item["quantity"] < comp_qty or not inv_item["userItemIds"]:
+                        return None  # Komponen tidak terpenuhi
+                    # Ambil userItemId sebanyak comp_qty (dianggap comp_qty selalu 1 untuk kesederhanaan)
+                    required_fish_ids.append(inv_item["userItemIds"][0])
+                return required_fish_ids
+
+            recipe_to_cook = None
+            fish_ids_to_use = None
+
+            # Iterasi resep-resep aktif
+            for recipe in recipes_data:
+                if not recipe.get("active", False):
+                    continue
+                # Pastikan resep dapat diakses berdasarkan level:
+                # level cooking user harus sama atau lebih besar ketimbang resep (unlockLevel)
+                if recipe.get("unlockLevel", 0) > user_cooking_level:
+                    continue
+                # Cek apakah semua komponen yang dibutuhkan tersedia
+                fish_ids = can_cook_recipe(recipe)
+                if fish_ids:
+                    recipe_to_cook = recipe
+                    fish_ids_to_use = fish_ids
+                    break
+
+            if not recipe_to_cook:
+                self.log("ℹ️ No cooking recipe available that meets your inventory and level.", Fore.YELLOW)
+                return 1
+
+            # Siapkan payload untuk claim cooking recipe
+            payload = {
+                "cookingRecipeId": recipe_to_cook.get("id"),
+                "quantity": 1,
+                "fishs": fish_ids_to_use,
+                "shinyFishs": [],
+                "transactionHash": None
+            }
+
+            claim_url = f"{self.BASE_URL}cooking-recipes/claim"
+            self.log(f"📡 Attempting to cook recipe: {recipe_to_cook.get('name')}", Fore.CYAN)
+            claim_response = requests.post(claim_url, headers=headers, json=payload)
+            claim_response.raise_for_status()
+            claim_result = claim_response.json()
+
+            # Log hasil claim dan rewards
+            rewards = claim_result.get("formattedRewards", [])
+            if rewards:
+                self.log("✅ Cooking successful! Received rewards:", Fore.GREEN)
+                for reward in rewards:
+                    self.log(f"   - {reward.get('name')} x {reward.get('quantity')}", Fore.LIGHTCYAN_EX)
+            else:
+                self.log("ℹ️ Cooking executed, but no rewards found in response.", Fore.YELLOW)
+            return 1
+
+        except requests.exceptions.RequestException as e:
+            self.log(f"❌ Failed to process cooking: {e}", Fore.RED)
+            return 0
+        except ValueError as e:
+            self.log(f"❌ Data error: {e}", Fore.RED)
+            return 0
+        except Exception as e:
+            self.log(f"❌ An unexpected error occurred during cooking: {e}", Fore.RED)
+            return 0
 
 async def process_account(account, original_index, account_label, fishing, config):
     # Set a random fake User-Agent for this account
@@ -992,10 +1344,13 @@ async def process_account(account, original_index, account_label, fishing, confi
 
     fishing.log("🛠️ Starting task execution...", Fore.CYAN)
     tasks_config = {
+        "event": "🎉 Event - Switch to the event theme for special activities.",
         "daily": "🌞 Daily Check-In - Log in daily for rewards.",
         "sell_all_fish": "🐟 Sell All Fish - Convert your fish into extra gold.",
         "upgrade_skill": "🚀 Upgrade Skill - Enhance your fishing abilities.",
         "quest": "📜 Quest - Complete quests to earn rewards.",
+        "battle_pass": "auto battle pass",
+        "cooking": "auto cooking",
         "fishing": "🎣 Fishing Tester - Try out the fishing."
     }
 

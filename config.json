@@ -1,12 +1,15 @@
 {
+    "cooking": true,
+    "battle_pass": true,
     "quest": true,
     "upgrade_skill": true,
-    "event": false,
+    "event": true,
     "fishing": true,
-    "fishing_type": 1,
+    "fishing_type": 2,
     "daily": true,
     "sell_all_fish": false,
-    "proxy": true,
+    "proxy": false,
+    "run_with_reff": false,
     "thread": 1,
     "delay_loop": 3000,
     "delay_account_switch": 10
