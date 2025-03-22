@@ -49,8 +49,9 @@ Click the link below to register:
 
 > **🚀 Upcoming Updates:**
 >
-> - Additional login methods via email and wallet.
-> - Further feature optimizations and new automation capabilities.
+> - Optimization of the auto cooking system.
+> - Addition of the claim referral system.
+> - Optimization of all features.
 
 ---
 
