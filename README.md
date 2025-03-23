@@ -11,7 +11,7 @@
 Fishing Frenzy Bot automates various tasks in **Fishing Frenzy**, including:
 
 - **🔌 Proxy Support:** Use dynamic proxies for each account (mandatory for multi-account setups).
-- **🗺️ Quest Automation:** Automatically complete quests and events.
+- **🏟️ Quest Automation:** Automatically complete quests and events.
 - **💪 Upgrade Skill:** Auto-upgrade your character's skills.
 - **💰 Sell All Fish:** Automatically sell your caught fish without hassle.
 - **🎣 Fishing Automation:** Enjoy fully automated fishing with configurable types and updated API support for Fishing Frenzy Session 2.
@@ -21,37 +21,22 @@ Fishing Frenzy Bot automates various tasks in **Fishing Frenzy**, including:
 - **🪝 Bait Usage:** Automatically use all available bait items from your inventory.
 - **🍳 Auto Cooking:** Automatically process cooking recipes when ingredients are available.
 - **🔖 Auto Reff:** Automatically generate new accounts using referral codes.
-- **🧵 Thread System:** Run tasks concurrently for improved performance.
+- **🧵 Auto Claim Reff:** Automatically claim referral rewards.
+- **🷵 Thread System:** Run tasks concurrently for improved performance.
 
 This bot is designed to save you time and streamline your gameplay—so you can focus on strategy and enjoy the game! 😎
 
 ---
 
-## 📝 Register via Referral
-
-Before you install the bot, register your account with Fishing Frenzy using your referral code.  
-Click the link below to register:
-
-[🔗 Register for Fishing Frenzy](https://fishingfrenzy.co?code=EU6HOU)
-
----
-
 ## 🌟 Version Updates
 
-**Current Version: v1.0.5**
+**Current Version: v1.0.6**
 
-### v1.0.5 Updates:
+### v1.0.6 Updates:
 
-- **💡 Full Feature Optimization:** Overall improvements in performance and stability.
-- **🍳 Auto Cooking Feature:** Automatically process cooking recipes if ingredients are available.
-- **🔖 Auto Reff Feature:** Automatically generate new accounts using referral codes.
-- **🔗 Reff Accounts Integration:** Accounts generated via auto reff can now be run in the main bot by enabling `run_with_reff` in the configuration.
-
-> **🚀 Upcoming Updates:**
->
-> - Optimization of the auto cooking system.
-> - Addition of the claim referral system.
-> - Optimization of all features.
+- **💡 Feature Optimization:** Optimization of several features such as auto fishing and auto cooking.
+- **🧵 Auto Claim Reff:** Automatically claim referral rewards.
+- **🔧 Violent Monkey Extension:** Added Violent Monkey extension for easier query extraction.
 
 ---
 
@@ -67,7 +52,6 @@ Click the link below to register:
 | `upgrade_skill`        | Automatically upgrade your skills.                             | `true`            |
 | `event`                | Automatically switch to the event area.                        | `true`            |
 | `fishing`              | Enable automatic fishing.                                      | `true`            |
-| `fishing_type`         | Set the fishing type (1 for short, 2 for mid, and 3 for long). | `2`               |
 | `daily`                | Automatically complete daily tasks.                            | `true`            |
 | `sell_all_fish`        | Automatically sell all caught fish.                            | `false`           |
 | `proxy`                | Enable proxy usage for multi-account setups.                   | `false`           |
@@ -91,8 +75,7 @@ Click the link below to register:
 
 ### Main Bot Installation
 
-1. **Clone the Repository**  
-   Clone the project to your local machine:
+1. **Clone the Repository**
 
    ```bash
    git clone https://github.com/livexords-nw/fishingfrenzy-bot.git
@@ -112,49 +95,11 @@ Click the link below to register:
 
 4. **Configure Your Query**
 
-   **For Main Bot (`query.txt`)**  
-   Create a file named `query.txt` and add your query data. This file supports both token-based and guest logins.
-
-   **Token Login Example:**  
-   To use token login, open your browser, navigate to the Fishing Frenzy login page, and inspect the **Application** tab. Then, go to **Local Storage** and find the `fishauth` value. Copy it and use the following format:
-
-   ```text
-   auth_token|token
-   1234567890abcdef|token
-   0987654321fedcba|token
-   ```
-
-   **Guest Login Example:**
-
-   ```text
-   7fa317a4-0706-491b-aff4-ad2c53146018|guest
-   1c1ee4be-73a7-4d54-8500-91af7ecbcedd|guest
-   ```
-
-   _Tutorial:_  
-   Check out the image below for a step-by-step guide on obtaining your token from local storage:
-
-   ![Tutorial](tutorial.png)
-
-5. **Set Up Proxies (Mandatory for Multi-Account Usage)**  
-   If you're running multiple accounts, create a file named `proxy.txt` and add your proxies in this format:
-
-   ```text
-   http://username:password@ip:port
-   ```
-
-   > **Note:** Only HTTP and HTTPS proxies are supported.
-
-6. **Run the Main Bot**  
-   Start the bot with:
-
-   ```bash
-   python main.py
-   ```
+   Create a file named `query.txt` and add your query data.
 
 ---
 
-### Auto Reff Installation
+## 🔬 Auto Reff Installation
 
 1. **Prepare Auto Reff Files**  
    Create a file named `query_reff.txt` with the following content:
@@ -165,21 +110,38 @@ Click the link below to register:
 
    Here, `EU6HOU` is your referral code and `20` is the number of accounts you want to generate.
 
-2. **Run the Auto Reff Module**  
-   After installing dependencies (see Main Bot step 3), run:
+2. **Run the Auto Reff Module**
 
    ```bash
    python reff.py
    ```
 
-   The module will generate new referral accounts and save their device IDs to `result_query.txt` in the format:
-
-   ```text
-   deviceid|guest
-   ```
-
 3. **Integrate Reff Accounts**  
    To run the generated reff accounts in the main bot, enable `"run_with_reff": true` in your `config.json`.
+
+---
+
+## 💻 **Tutorial: Install the Extension**
+
+1. **Download the Extension:**  
+   Download the zip file `monster_kombat_extension_query.zip` from this repository.  
+   ![Download Image](download_extension.png)
+
+2. **Install Violent Monkey Extension:**  
+   Install the Violent Monkey extension in your browser using [this link](https://chromewebstore.google.com/detail/jinjaccalgkegednnccohejagnlnfdag?utm_source=item-share-cb).
+
+3. **Import the Zip File:**  
+   Open Violent Monkey, go to **Settings** → **Import from Zip**, and select the downloaded zip file.  
+   ![Import Zip Image](import_placeholder.png)
+
+4. **Activate the Extension on Monster Kombat Website:**  
+   Open the Monster Kombat website. If you are still logged in, please log out and log in again to ensure the extension is active.  
+   Make sure the extension is working correctly as shown below:  
+   ![Extension Active Image](extension_active_placeholder.png)
+
+5. **Capture and Copy the Query:**  
+   Once logged in, click **Format & Copy** on the extension.  
+   Then, paste the copied result into your `query.txt` file.
 
 ---
 

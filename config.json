@@ -1,11 +1,11 @@
 {
+    "reff": true,
     "cooking": true,
     "battle_pass": true,
     "quest": true,
     "upgrade_skill": true,
     "event": true,
     "fishing": true,
-    "fishing_type": 2,
     "daily": true,
     "sell_all_fish": false,
     "proxy": false,
