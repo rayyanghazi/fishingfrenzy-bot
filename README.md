@@ -124,7 +124,7 @@ This bot is designed to save you time and streamline your gameplay—so you can 
 ## 💻 **Tutorial: Install the Extension**
 
 1. **Download the Extension:**  
-   Download the zip file `monster_kombat_extension_query.zip` from this repository.  
+   Download the zip file `fishing_frenzy_query.zip` from this repository.  
    ![Download Image](download_extension.png)
 
 2. **Install Violent Monkey Extension:**  
@@ -134,13 +134,13 @@ This bot is designed to save you time and streamline your gameplay—so you can 
    Open Violent Monkey, go to **Settings** → **Import from Zip**, and select the downloaded zip file.  
    ![Import Zip Image](import_placeholder.png)
 
-4. **Activate the Extension on Monster Kombat Website:**  
-   Open the Monster Kombat website. If you are still logged in, please log out and log in again to ensure the extension is active.  
+4. **Activate the Extension on Fishing Frenzy Website:**  
+   Open the Fishing Frenzy website. If you are still logged in, please log out and log in again to ensure the extension is active.  
    Make sure the extension is working correctly as shown below:  
    ![Extension Active Image](extension_active_placeholder.png)
 
 5. **Capture and Copy the Query:**  
-   Once logged in, click **Format & Copy** on the extension.  
+   Once logged in, click **Format & Format Token** or **Format & Format Divace ID** on the extension.  
    Then, paste the copied result into your `query.txt` file.
 
 ---
