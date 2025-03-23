@@ -137,7 +137,7 @@ This bot is designed to save you time and streamline your gameplay—so you can 
 4. **Activate the Extension on Fishing Frenzy Website:**  
    Open the Fishing Frenzy website. If you are still logged in, please log out and log in again to ensure the extension is active.  
    Make sure the extension is working correctly as shown below:  
-   ![Extension Active Image](extension_active_placeholder.png)
+   ![Extension Active Image](extension_active_placeholder.jpg)
 
 5. **Capture and Copy the Query:**  
    Once logged in, click **Format & Format Token** or **Format & Format Divace ID** on the extension.  
