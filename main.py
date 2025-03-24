@@ -298,6 +298,38 @@ class fishingfrenzy:
 
         inventory_url = f"{self.BASE_URL}inventory"
         headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
+        
+        try:
+            self.log("📡 Refreshing inventory to update energy...", Fore.CYAN)
+            inv_response = requests.get(inventory_url, headers=headers)
+            inv_response.raise_for_status()
+            inv_data = inv_response.json()
+            self.energy = inv_data.get("energy", 0)
+            self.log(f"✅ Current energy: {self.energy}", Fore.GREEN)
+        except requests.exceptions.RequestException as e:
+            self.log(f"❌ Failed to refresh energy: {e}", Fore.RED)
+            return 0
+
+        # Prepare bait once at the beginning.
+        self.bait()
+
+        # If energy is below 3 at startup, try to restore energy.
+        if self.energy < 3:
+            self.log("ℹ️ Energy is below 3 at startup. Attempting to restore energy...", Fore.YELLOW)
+            result = self.restore_energy()
+            if result == 0:
+                self.log("❌ Failed to buy sushi. Terminating fishing session.", Fore.RED)
+                return 0
+            # Refresh energy after sushi purchase.
+            try:
+                inv_response = requests.get(inventory_url, headers=headers)
+                inv_response.raise_for_status()
+                inv_data = inv_response.json()
+                self.energy = inv_data.get("energy", 0)
+                self.log(f"✅ Energy after sushi purchase: {self.energy}", Fore.GREEN)
+            except requests.exceptions.RequestException as e:
+                self.log(f"❌ Failed to refresh energy after sushi purchase: {e}", Fore.RED)
+                return 0
 
         while True:
             # --- Refresh energy from the server ---
@@ -329,14 +361,13 @@ class fishingfrenzy:
 
             # Check if energy is sufficient for the selected option.
             if self.energy < energy_cost:
-                self.log("⚠️ Not enough energy for the current option. Attempting to buy and use sushi...", Fore.YELLOW)
-                result = self.buy_and_use_sushi()
+                self.log("⚠️ Not enough energy for the current option. Attempting to restore energy...", Fore.YELLOW)
+                result = self.restore_energy()
                 if result == 0:
                     self.log("❌ Not enough gold to buy sushi. Continuing loop to refresh energy...", Fore.YELLOW)
                 time.sleep(1)
                 continue
 
-            self.bait()
             self.log(f"🎣 Starting fishing session with type: {range_type} (energy cost: {energy_cost}) (current energy: {self.energy})", Fore.CYAN)
 
             ws_url = f"wss://api.fishingfrenzy.co/?token={self.access_token}"
@@ -488,12 +519,12 @@ class fishingfrenzy:
 
                 ws.close()
 
-                # Do not decrease self.energy manually; it will be refreshed from the server at the start of the next iteration.
+                # --- After the session, refresh energy again ---
                 time.sleep(1)
-                # If energy is still low, try buying sushi before next session.
-                if self.energy < energy_cost:
-                    self.log("⚠️ Not enough energy for fishing. Attempting to buy and use sushi...", Fore.YELLOW)
-                    result = self.buy_and_use_sushi()
+                # If after the session energy is below 3, try to buy and use sushi.
+                if self.energy < 3:
+                    self.log("ℹ️ After session, energy is below 3. Attempting to restore energy...", Fore.YELLOW)
+                    result = self.restore_energy()
                     if result == 0:
                         self.log("❌ Not enough gold to buy sushi. Continuing loop...", Fore.YELLOW)
                     time.sleep(1)
@@ -742,19 +773,168 @@ class fishingfrenzy:
         except Exception as e:
             self.log(f"❌ An unexpected error occurred: {e}", Fore.RED)
             return 0
-
-    def buy_and_use_sushi(self) -> int:
+        
+    def chest(self) -> int:
         """
-        Buys and uses sushi to replenish energy.
+        Checks the inventory for available in-game chests and opens each chest.
+        
+        Process:
+        1. Sends a GET request to the inventory API endpoint.
+        2. Looks for "list_chest_info" -> "inGame" to retrieve available chests.
+        3. For each chest in the "inGame" list, attempts to open it using a GET request
+            to {self.BASE_URL}chests/{chest_id}/open. If the request fails, it will retry up to 3 times.
+        4. Logs the name of each chest after opening or reports failure after exhausting attempts.
+        
+        Returns:
+        1 on overall success (even if one chest fails after retries, the function will continue),
+        or 0 if the inventory request fails.
+        """
+        req_url_inventory = f"{self.BASE_URL}inventory"
+        headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
+        
+        try:
+            self.log("📡 Checking inventory for chests...", Fore.CYAN)
+            response = requests.get(req_url_inventory, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.RequestException as e:
+            self.log(f"❌ Failed to retrieve inventory: {e}", Fore.RED)
+            return 0
+        
+        # Retrieve chest information from the inventory.
+        chest_info = data.get("list_chest_info", {})
+        in_game_chests = chest_info.get("inGame", [])
+        
+        if not in_game_chests:
+            self.log("ℹ️ No in-game chests found.", Fore.YELLOW)
+            return 1
+
+        # Attempt to open each chest.
+        for chest in in_game_chests:
+            chest_id = chest.get("id")
+            chest_name = chest.get("name", "Unknown Chest")
+            open_url = f"{self.BASE_URL}chests/{chest_id}/open"
+            max_attempts = 3
+            success = False
+
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    self.log(f"📡 Opening chest: {chest_name} (ID: {chest_id}) - Attempt {attempt}", Fore.CYAN)
+                    open_response = requests.get(open_url, headers=headers)
+                    open_response.raise_for_status()
+                    self.log(f"✅ Opened chest: {chest_name}", Fore.GREEN)
+                    success = True
+                    break  # Exit retry loop on success.
+                except requests.exceptions.RequestException as e:
+                    self.log(f"❌ Failed to open chest {chest_name} on attempt {attempt}: {e}", Fore.RED)
+                    time.sleep(1)  # Wait briefly before retrying.
+            
+            if not success:
+                self.log(f"❌ Giving up on chest: {chest_name}", Fore.RED)
+        
+        return 1
+    
+        def rod(self) -> int:
+            """
+            Checks the inventory for available in-game rods, compares them with the currently activated rod,
+            and automatically equips the best rod in one go.
+
+            Process:
+            1. Sends a GET request to the inventory API endpoint using standard headers.
+            2. Retrieves rod information from "list_rod_info" (only the inGame section) and the "activatedRod" field.
+            3. Logs available rods.
+            4. If no rod is activated (activatedRod is null), selects the highest quality rod.
+                If a rod is activated, selects the best rod with quality higher than the active rod.
+            5. If a better rod is found, sends a POST request to equip that rod.
+
+            Returns:
+            1 on success, or 0 if an error occurs.
+            """
+            req_url_inventory = f"{self.BASE_URL}inventory"
+            headers = {**self.HEADERS, "authorization": f"Bearer {self.access_token}"}
+
+            try:
+                self.log("📡 Checking inventory for rod info...", Fore.CYAN)
+                response = requests.get(req_url_inventory, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+            except requests.exceptions.RequestException as e:
+                self.log(f"❌ Failed to retrieve inventory: {e}", Fore.RED)
+                return 0
+
+            # Retrieve rod information.
+            rod_info = data.get("list_rod_info", {})
+            in_game_rods = rod_info.get("inGame", [])
+
+            if not in_game_rods:
+                self.log("ℹ️ No in-game rods found.", Fore.YELLOW)
+                return 1
+
+            self.log(f"✅ Found {len(in_game_rods)} in-game rod(s):", Fore.GREEN)
+            for rod in in_game_rods:
+                rod_name = rod.get("name", "Unknown Rod")
+                rod_id = rod.get("id", "N/A")
+                rod_quality = rod.get("quality", 0)
+                self.log(f"   - {rod_name} (ID: {rod_id}, Quality: {rod_quality})", Fore.LIGHTCYAN_EX)
+
+            # Retrieve the currently activated rod.
+            activated_rod = data.get("activatedRod", None)
+
+            # Determine the rod to equip.
+            rod_to_equip = None
+            if activated_rod is None:
+                # If no rod is active, choose the highest quality rod.
+                self.log("ℹ️ No rod is currently activated. Will select the best available rod.", Fore.YELLOW)
+                rod_to_equip = max(in_game_rods, key=lambda r: r.get("quality", 0))
+            else:
+                active_quality = activated_rod.get("quality", 0)
+                active_id = activated_rod.get("id", "N/A")
+                active_name = activated_rod.get("name", "Unknown Active Rod")
+                self.log(f"✅ Activated rod: {active_name} (Quality: {active_quality})", Fore.GREEN)
+
+                # Check if any rod is the same as the currently activated rod.
+                for rod in in_game_rods:
+                    if rod.get("id") == active_id:
+                        self.log(f"ℹ️ Rod '{active_name}' is already equipped.", Fore.YELLOW)
+                        return 1
+
+                # Look for any rod with a quality higher than the active rod.
+                better_rods = [r for r in in_game_rods if r.get("quality", 0) > active_quality]
+                if better_rods:
+                    rod_to_equip = max(better_rods, key=lambda r: r.get("quality", 0))
+                else:
+                    self.log("ℹ️ No available rod is better than the currently activated rod.", Fore.YELLOW)
+
+            # Equip the selected rod if one is found.
+            if rod_to_equip is not None:
+                rod_id = rod_to_equip.get("id")
+                rod_name = rod_to_equip.get("name", "Unknown Rod")
+                self.log(f"🔔 Equipping rod '{rod_name}' (Quality: {rod_to_equip.get('quality', 0)}).", Fore.CYAN)
+                equip_url = f"{self.BASE_URL}rods/{rod_id}/equip"
+                try:
+                    equip_response = requests.post(equip_url, headers=headers)
+                    equip_response.raise_for_status()
+                    self.log(f"✅ Successfully equipped rod: {rod_name}", Fore.GREEN)
+                except requests.exceptions.RequestException as e:
+                    self.log(f"❌ Failed to equip rod {rod_name}: {e}", Fore.RED)
+            else:
+                self.log("ℹ️ No rod to equip based on the criteria.", Fore.YELLOW)
+
+            return 1
+
+    def restore_energy(self) -> int:
+        """
+        Restores energy by first buying and using sushi, and then using sashimi if needed.
         
         Steps:
         1. Checks the user's inventory.
-        2. Uses available Sushi to restore energy (each Sushi restores a certain amount).
-        3. If the Sushi count is low (less than 5) and energy belum penuh, attempts to purchase more,
-        kemudian langsung menggunakan sushi yang baru dibeli.
+        2. If energy is not full and the sushi quantity is low (less than 5), attempts to purchase more sushi.
+        3. Uses available sushi to restore energy (each sushi restores a certain amount).
+        4. If energy is still below maximum after using sushi, uses sashimi to further restore energy.
         
-        Note:
-        - The Sushi item is identified by the fixed ID "668d070357fb368ad9e91c8a".
+        Notes:
+        - The sushi item is identified by the fixed ID "668d070357fb368ad9e91c8a".
+        - The sashimi item is identified by the fixed ID "67d5896dda75ce740f7db32e" and restores 1 energy per unit.
         - Assumes a maximum energy of 30.
         """
         req_url_inventory = f"{self.BASE_URL}inventory"
@@ -766,14 +946,15 @@ class fishingfrenzy:
             response.raise_for_status()
             data = response.json()
 
-            # Retrieve basic user info from inventory data
+            # Retrieve basic user info from inventory data.
             user_id = data.get("userId")
             gold = data.get("gold", 0)
             energy = data.get("energy", 0)
             self.energy = energy
             max_energy = 30  # assumed maximum energy
 
-            # Locate the Sushi item by its fixed ID
+            # --- SUSHI SECTION ---
+            # Locate the sushi item by its fixed ID.
             sushi_id = "668d070357fb368ad9e91c8a"
             sushi_item = next(
                 (item for item in data.get("list_item_info", []) if item.get("id") == sushi_id),
@@ -783,69 +964,94 @@ class fishingfrenzy:
             if sushi_item:
                 sushi_quantity = sushi_item.get("quantity", 0)
                 sushi_effect = sushi_item.get("effect", 0)  # energy restored per sushi
-                # Extract the price; assume it's stored as a list of price dictionaries
+                # Assume the price is stored as a list of price dictionaries.
                 sushi_price = sushi_item.get("price", [{}])[0].get("amount", 0)
             else:
                 self.log("ℹ️ Sushi item not found in your inventory. Assuming 0 available.", Fore.YELLOW)
                 sushi_quantity = 0
-                # Set default values if Sushi is not found
                 sushi_effect = 5     # Default energy restored per sushi
                 sushi_price = 500    # Default price in gold
 
-            # Fungsi untuk langsung pakai sushi (gunakan satu per satu)
-            def use_sushi(times: int) -> None:
-                nonlocal energy
-                for _ in range(times):
-                    req_url_use_sushi = f"{self.BASE_URL}items/{sushi_id}/use?userId={user_id}&quantity=1"
-                    use_response = requests.get(req_url_use_sushi, headers=headers)
-                    use_response.raise_for_status()
-                    data_use = use_response.json()
-                    energy = data_use.get('energy', energy)
-                    self.energy = energy
-                if times > 0:
-                    self.log(f"✅ Used {times} Sushi to restore energy. Current energy: {energy}", Fore.GREEN)
-
-            # Calculate how much energy is needed
+            # Calculate how much energy is needed.
             energy_needed = max_energy - energy
-            if energy_needed > 0:
-                # Tentukan berapa sushi yang diperlukan (gunakan pembagian integer)
-                needed_sushi = energy_needed // sushi_effect
-                if energy_needed % sushi_effect != 0:
-                    needed_sushi += 1
-                # Gunakan sushi yang tersedia di inventory
-                used_sushi = min(sushi_quantity, needed_sushi)
-                if used_sushi > 0:
-                    use_sushi(used_sushi)
-                    sushi_quantity -= used_sushi
-                else:
-                    self.log("ℹ️ Not enough Sushi in inventory to restore energy.", Fore.YELLOW)
-            else:
+            if energy_needed <= 0:
                 self.log("ℹ️ Your energy is already full.", Fore.YELLOW)
+                return 1
 
-            # Jika energi belum penuh dan jumlah sushi kurang dari 5, coba beli dan langsung pakai
-            if self.energy < max_energy and sushi_quantity < 5:
+            # Determine the number of sushi needed.
+            needed_sushi = energy_needed // sushi_effect
+            if energy_needed % sushi_effect != 0:
+                needed_sushi += 1
+
+            # If available sushi is low (less than 5) and energy is not full,
+            # attempt to purchase additional sushi.
+            if sushi_quantity < 5:
                 max_buyable = gold // sushi_price if sushi_price > 0 else 0
-                if max_buyable > 0:
-                    # Beli sushi hingga maksimal 5 buah (atau sesuai kebutuhan untuk full energy)
-                    needed_after = max_energy - self.energy
-                    needed_sushi_after = needed_after // sushi_effect
-                    if needed_after % sushi_effect != 0:
-                        needed_sushi_after += 1
-                    buy_quantity = min(max_buyable, 5, needed_sushi_after)
+                # Purchase enough sushi to reach either 5 in inventory or fulfill the needed amount.
+                buy_quantity = min(max_buyable, max(0, 5 - sushi_quantity), needed_sushi)
+                if buy_quantity > 0:
                     req_url_buy_sushi = f"{self.BASE_URL}items/{sushi_id}/buy?userId={user_id}&quantity={buy_quantity}"
                     buy_response = requests.get(req_url_buy_sushi, headers=headers)
                     buy_response.raise_for_status()
                     self.log(f"✅ Purchased {buy_quantity} Sushi.", Fore.GREEN)
-                    # Setelah beli, langsung gunakan sushi tersebut
-                    use_sushi(buy_quantity)
+                    sushi_quantity += buy_quantity
                 else:
-                    self.log("❌ Not enough gold to buy Sushi.", Fore.RED)
-                    return 0
+                    self.log("❌ Not enough gold to buy additional Sushi.", Fore.RED)
+                    # Proceed with whatever sushi is available.
+
+            # Use sushi from inventory to restore energy.
+            use_count = min(sushi_quantity, needed_sushi)
+            if use_count > 0:
+                req_url_use_sushi = f"{self.BASE_URL}items/{sushi_id}/use?userId={user_id}&quantity={use_count}"
+                use_response = requests.get(req_url_use_sushi, headers=headers)
+                use_response.raise_for_status()
+                data_use = use_response.json()
+                energy = data_use.get('energy', energy)
+                self.energy = energy
+                self.log(f"✅ Used {use_count} Sushi to restore energy. Current energy: {energy}", Fore.GREEN)
+            else:
+                self.log("ℹ️ No Sushi available in inventory to use.", Fore.YELLOW)
+
+            # --- SASHIMI SECTION ---
+            # If energy is still below maximum after using sushi, attempt to use sashimi.
+            if self.energy < max_energy:
+                # Locate the sashimi item by its fixed ID.
+                sashimi_id = "67d5896dda75ce740f7db32e"
+                sashimi_item = next(
+                    (item for item in data.get("list_item_info", []) if item.get("id") == sashimi_id),
+                    None
+                )
+
+                if sashimi_item:
+                    sashimi_quantity = sashimi_item.get("quantity", 0)
+                    sashimi_effect = 1  # Each sashimi restores 1 energy.
+                    sashimi_price = sashimi_item.get("price", [{}])[0].get("amount", 0)
+                else:
+                    self.log("ℹ️ Sashimi item not found in your inventory. Assuming 0 available.", Fore.YELLOW)
+                    sashimi_quantity = 0
+                    sashimi_effect = 1
+                    sashimi_price = 500  # Default price
+
+                # Recalculate the energy needed.
+                energy_needed = max_energy - self.energy
+                needed_sashimi = energy_needed  # 1 energy per sashimi.
+
+                use_sashimi_count = min(sashimi_quantity, needed_sashimi)
+                if use_sashimi_count > 0:
+                    req_url_use_sashimi = f"{self.BASE_URL}items/{sashimi_id}/use?userId={user_id}&quantity={use_sashimi_count}"
+                    use_response = requests.get(req_url_use_sashimi, headers=headers)
+                    use_response.raise_for_status()
+                    data_use = use_response.json()
+                    new_energy = data_use.get("energy", self.energy)
+                    self.energy = new_energy
+                    self.log(f"✅ Used {use_sashimi_count} Sashimi to restore energy. Current energy: {new_energy}", Fore.GREEN)
+                else:
+                    self.log("ℹ️ No Sashimi available to use.", Fore.YELLOW)
 
             return 1
 
         except requests.exceptions.RequestException as e:
-            self.log(f"❌ Failed to process sushi transactions: {e}", Fore.RED)
+            self.log(f"❌ Failed to process energy restoration: {e}", Fore.RED)
             return 0
         except ValueError as e:
             self.log(f"❌ Data error: {e}", Fore.RED)
@@ -1387,14 +1593,16 @@ async def process_account(account, original_index, account_label, fishing, confi
 
     fishing.log("🛠️ Starting task execution...", Fore.CYAN)
     tasks_config = {
-        "event": "🎉 Event - Switch to event mode.",
-        "daily": "🌞 Daily Check-In - Log in for rewards.",
-        "sell_all_fish": "🐟 Sell All Fish - Sell your fish for gold.",
+        "event": "🎊 Event - Switch to event mode.",
+        "daily": "☀️ Daily Check-In - Log in for rewards.",
+        "sell_all_fish": "🐠 Sell All Fish - Sell your fish for gold.",
         "upgrade_skill": "🚀 Upgrade Skill - Boost your fishing skills.",
         "quest": "📜 Quest - Complete quests for rewards.",
-        "battle_pass": "🔥 Battle Pass - Activate for extra challenges.",
-        "cooking": "🍳 Cooking - Cook recipes for bonuses.",
-        "reff": "🤝 Referral - Claim referral rewards.",
+        "battle_pass": "🏆 Battle Pass - Activate for extra challenges.",
+        "cooking": "🍲 Cooking - Cook recipes for bonuses.",
+        "reff": "🔗 Referral - Claim referral rewards.",
+        "chest": "📦 Chest - Auto open all available chests in your backpack.",
+        "rod": "🔱 Rod - Auto equip the best rod available.",
         "fishing": "🎣 Fishing - Try your hand at fishing."
     }
 

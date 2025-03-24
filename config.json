@@ -1,4 +1,6 @@
 {
+    "chest": true,
+    "rod": true,
     "reff": true,
     "cooking": true,
     "battle_pass": true,

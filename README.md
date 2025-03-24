@@ -22,6 +22,8 @@ Fishing Frenzy Bot automates various tasks in **Fishing Frenzy**, including:
 - **🍳 Auto Cooking:** Automatically process cooking recipes when ingredients are available.
 - **🔖 Auto Reff:** Automatically generate new accounts using referral codes.
 - **🧵 Auto Claim Reff:** Automatically claim referral rewards.
+- **📦 Auto Open Chest:** Automatically open all available chests in your backpack (only in game).
+- **🔱 Auto Equip Rod:** Automatically equip the best available rod in your inventory (only in game). The bot compares the activated rod (if any) with available ones and equips a better rod if found.
 - **🷵 Thread System:** Run tasks concurrently for improved performance.
 
 This bot is designed to save you time and streamline your gameplay—so you can focus on strategy and enjoy the game! 😎
@@ -30,35 +32,45 @@ This bot is designed to save you time and streamline your gameplay—so you can 
 
 ## 🌟 Version Updates
 
-**Current Version: v1.0.6**
+**Current Version: v1.0.7**
 
-### v1.0.6 Updates:
+### v1.0.7 Updates:
 
-- **💡 Feature Optimization:** Optimization of several features such as auto fishing and auto cooking.
-- **🧵 Auto Claim Reff:** Automatically claim referral rewards.
-- **🔧 Violent Monkey Extension:** Added Violent Monkey extension for easier query extraction.
+- **📦 Auto Open Chest:** Now the bot automatically opens available chests (in-game only) from your backpack.
+- **🔱 Auto Equip Rod:** The bot automatically equips the best rod available (in-game only). It compares the activated rod with the ones in inventory and equips a better rod if available. If the activated rod is the same as the best available, no action is taken.
+- **🎣 & 🍣 System Optimization:** Improved the fishing system and optimized the buy-and-use sushi feature for energy restoration.
 
 ---
 
+## 📝 Register 
+
+Before you install the bot, register your account with Fishing Frenzy.  
+Click the link below to register:
+
+[🔗 Register for Fishing Frenzy](https://fishingfrenzy.co?code=EU6HOU)
+
+---
 ## ⚙️ Configuration
 
 ### Main Bot Configuration (`config.json`)
 
-| **Setting**            | **Description**                                                | **Default Value** |
-| ---------------------- | -------------------------------------------------------------- | ----------------- |
-| `cooking`              | Enable the auto cooking feature.                               | `true`            |
-| `battle_pass`          | Automatically claim battle pass rewards.                       | `true`            |
-| `quest`                | Automatically complete quests.                                 | `true`            |
-| `upgrade_skill`        | Automatically upgrade your skills.                             | `true`            |
-| `event`                | Automatically switch to the event area.                        | `true`            |
-| `fishing`              | Enable automatic fishing.                                      | `true`            |
-| `daily`                | Automatically complete daily tasks.                            | `true`            |
-| `sell_all_fish`        | Automatically sell all caught fish.                            | `false`           |
-| `proxy`                | Enable proxy usage for multi-account setups.                   | `false`           |
-| `run_with_reff`        | Enable running accounts generated via auto reff.               | `false`           |
-| `thread`               | Number of threads to run concurrently.                         | `1`               |
-| `delay_loop`           | Delay (in seconds) before the next loop.                       | `3000`            |
-| `delay_account_switch` | Delay (in seconds) between switching accounts.                 | `10`              |
+| **Setting**            | **Description**                                  | **Default Value** |
+| ---------------------- | ------------------------------------------------ | ----------------- |
+| `chest`                | Enable auto open chest (in-game).                | `true`            |
+| `rod`                  | Enable auto equip rod (in-game).                 | `true`            |
+| `cooking`              | Enable the auto cooking feature.                 | `true`            |
+| `battle_pass`          | Automatically claim battle pass rewards.         | `true`            |
+| `quest`                | Automatically complete quests.                   | `true`            |
+| `upgrade_skill`        | Automatically upgrade your skills.               | `true`            |
+| `event`                | Automatically switch to the event area.          | `true`            |
+| `fishing`              | Enable automatic fishing.                        | `true`            |
+| `daily`                | Automatically complete daily tasks.              | `true`            |
+| `sell_all_fish`        | Automatically sell all caught fish.              | `false`           |
+| `proxy`                | Enable proxy usage for multi-account setups.     | `false`           |
+| `run_with_reff`        | Enable running accounts generated via auto reff. | `false`           |
+| `thread`               | Number of threads to run concurrently.           | `1`               |
+| `delay_loop`           | Delay (in seconds) before the next loop.         | `3000`            |
+| `delay_account_switch` | Delay (in seconds) between switching accounts.   | `10`              |
 
 ### Reff Configuration (`config_reff.json`)
 
@@ -96,6 +108,12 @@ This bot is designed to save you time and streamline your gameplay—so you can 
 4. **Configure Your Query**
 
    Create a file named `query.txt` and add your query data.
+
+5. **Run Bot**
+
+   ```bash
+   python main.py
+   ```
 
 ---
 
