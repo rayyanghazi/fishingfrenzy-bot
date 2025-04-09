@@ -1175,6 +1175,8 @@ class fishingfrenzy:
                 f"[CONFIG] {task_name}: {'✅ Enabled' if task_status else '❌ Disabled'}",
                 Fore.CYAN,
             )
+            if task_status == False:
+                return 0
 
             # Jika available sushi kurang (kurang dari 5) dan energy tidak full,
             # coba beli tambahan sushi apabila konfigurasi buy_sushi aktif.
@@ -1195,7 +1197,7 @@ class fishingfrenzy:
                         self.log(
                             "❌ Not enough gold to buy additional Sushi.", Fore.RED
                         )
-                        # Lanjutkan dengan sushi yang tersedia.
+                        return 0
                 else:
                     self.log(
                         "ℹ️ Config 'buy_sushi' disabled, skipping sushi purchase.",
