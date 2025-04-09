@@ -2,3 +2,6 @@ colorama
 requests
 websocket-client
 fake-useragent
+brotli
+chardet
+urllib3
